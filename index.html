@@ -137,15 +137,17 @@ body.focus .app{grid-template-rows:minmax(0,1fr) var(--rollrow,minmax(170px,36vh
 .chbeat.sel{outline:2px solid var(--accent)}
 .chchip{display:block;font-weight:700;font-size:13.5px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid #2f9e44;padding-left:4px}
 .chchip.bad{border-left-color:#e03131;color:#c92a2a}
+.chchip.col{border-left-color:#f08c00}
 .chchip small{display:block;font-weight:400;font-size:10px;color:#6b7580}
 .chchip.src-user{color:#1c64c8}.chchip.src-ai{color:#7b2fbf}
 .chcont{color:#b0b8c0;font-size:12px}
 .chmel{font-size:11px;color:#4a525c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chmel .stg{font-weight:800;color:#111}
 .chmel i{color:#9aa3ad;font-style:normal}
+.chvers{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 8px;font-size:13px}.chvers>div{flex-basis:100%}
 .chlegend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:#4a525c;margin-top:6px}
 .chlegend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:-1px}
-.chlegend i.ok{background:#2f9e44}.chlegend i.bad{background:#e03131}
+.chlegend i.ok{background:#2f9e44}.chlegend i.bad{background:#e03131}.chlegend i.col{background:#f08c00}
 .chpop{width:min(480px,calc(100vw - 32px))}
 .chsec{font-size:12px;color:#4a525c;margin:8px 0 4px;font-weight:600}
 .chopts{display:flex;gap:5px;flex-wrap:wrap}
@@ -765,8 +767,9 @@ body.roll-keys .roll .legend, body.roll-keys .roll .roll-hint{display:none}
       <button class="btn" id="chClear">🧹 清除和弦</button>
     </div>
     <div class="muted" id="chMsg" style="min-height:18px"></div>
+    <div class="chvers" id="chVers" hidden></div>
     <div class="chgrid" id="chGrid"></div>
-    <div class="chlegend"><span><i class="ok"></i>綠 = 重拍音全部係和弦音</span><span><i class="bad"></i>紅 = 有重拍音唔喺和弦入面（會撞）</span><span>藍字 = 你自己揀；紫字 = AI 揀；黑字 = 樂理自動配</span><span id="chStat"></span></div>
+    <div class="chlegend"><span><i class="ok"></i>綠 = 重拍音全部係和弦音</span><span><i class="col"></i>橙 = 重拍音係色彩音（9／maj7／6，周杰倫式張力）</span><span><i class="bad"></i>紅 = 有重拍音唔喺和弦入面（會撞）</span><span>藍字 = 你自己揀；紫字 = AI 揀；黑字 = 樂理自動配</span><span id="chStat"></span></div>
     <h3>伴奏</h3>
     <div class="arrset">
       <label>伴奏型 <select id="chPat"></select></label>
@@ -1045,11 +1048,18 @@ const Core = (() => {
     {suf:'',iv:[0,4,7],pen:0,kind:'major'},{suf:'m',iv:[0,3,7],pen:0,kind:'minor'},
     {suf:'7',iv:[0,4,7,10],pen:0.18,kind:'dominant'},{suf:'m7',iv:[0,3,7,10],pen:0.18,kind:'minor-seventh'},
     {suf:'maj7',iv:[0,4,7,11],pen:0.2,kind:'major-seventh'},{suf:'dim',iv:[0,3,6],pen:0.2,kind:'diminished'},
-    {suf:'sus4',iv:[0,5,7],pen:0.25,kind:'suspended-fourth'}];
+    {suf:'sus4',iv:[0,5,7],pen:0.25,kind:'suspended-fourth'},
+    // 流行 / 周杰倫式常見：6、m7♭5（半減七）、增、sus2、add9、7sus4、減七、m9
+    {suf:'6',iv:[0,4,7,9],pen:0.22,kind:'major-sixth'},{suf:'m7b5',iv:[0,3,6,10],pen:0.2,kind:'half-diminished'},
+    {suf:'aug',iv:[0,4,8],pen:0.2,kind:'augmented'},{suf:'sus2',iv:[0,2,7],pen:0.3,kind:'suspended-second'},
+    {suf:'add9',iv:[0,4,7,2],pen:0.3,kind:'major'},{suf:'7sus4',iv:[0,5,7,10],pen:0.3,kind:'suspended-fourth'},
+    {suf:'dim7',iv:[0,3,6,9],pen:0.25,kind:'diminished-seventh'},{suf:'m9',iv:[0,3,7,10,2],pen:0.36,kind:'minor-ninth'}];
   // 和弦根音：調內音用調性拼法；調外音喺升號調用升、其他用降（例如 C 大調入面係 Bb 唔係 A#）
-  function chordRootSpell(pc, fifths, diat){
+  function chordRootSpell(pc, fifths, diat, suf){
     if(diat.has(pc)) return spell(pc,fifths);
-    const useSharp = fifths>=2 || (pc===6 && fifths>=-1);
+    // 升號調入面借用嘅大三和弦（♭VI、♭VII、♭III、♭II）用降號：D 大調寫 B♭ 唔寫 A♯
+    const rel=mod(pc-mod(fifths*7,12),12), borrowed=suf!=null && fifths>=2 && [1,3,8,10].includes(rel) && !/^m(?!aj)|^dim|^m7b5/.test(suf);
+    const useSharp = !borrowed && (fifths>=2 || (pc===6 && fifths>=-1));
     const c=[]; for(const L of LETTERS){ const a=mod(pc-NAT[L]+6,12)-6; if(a>=-1&&a<=1) c.push({step:L,alter:a}); }
     return c.find(x=>x.alter===0) || c.find(x=>x.alter===(useSharp?1:-1)) || c[0];
   }
@@ -1072,16 +1082,25 @@ const Core = (() => {
           const w=ov*(n.pitch<55?2:n.pitch<72?1:0.6)*(0.4+n.vel/127); h[n.pitch%12]+=w; total+=w; if(ov>=Math.min(2,E-S) && n.pitch<lowest) lowest=n.pitch; }
         if(total<1){ list.push(null); continue; }
         const bassPc = lowest<Infinity ? lowest%12 : -1;
-        let best=null;
+        let best=null; const cands=[];
         for(let r=0;r<12;r++) for(const T of CHORD_TYPES){
           const pcs=new Set(T.iv.map(i=>(r+i)%12)); let inn=0,outw=0; for(let i=0;i<12;i++) (pcs.has(i)?inn+=h[i]:outw+=h[i]);
-          let sc=inn-0.5*outw-T.pen*total+(bassPc===r?0.2*total:pcs.has(bassPc)?0.04*total:0)+(diat.has(r)?0.05*total:0)+0.1*h[r];
-          if(!best||sc>best.sc) best={sc,root:r,T,pcs};
+          // 增三和弦對稱（D+ = F♯+ = A♯+）：唔理低音，揀調內根音（主音最好）
+          const rootBass = T.suf==='aug' ? (diat.has(r)?0.12*total:0)+(r===tonicMaj?0.06*total:0) : (bassPc===r?0.2*total:pcs.has(bassPc)?0.04*total:0);
+          let sc=inn-0.5*outw-T.pen*total+rootBass+(diat.has(r)?0.05*total:0)+0.1*h[r];
+          // 每粒和弦音都要真係響過（防止用 add9 / m9 呢啲大和弦「食晒」所有音）
+          if(T.iv.length>=4 && [...pcs].some(pc=>h[pc]<0.02*total)) sc-=0.3*total;
+          cands.push({sc,root:r,T,pcs}); if(!best||sc>best.sc) best={sc,root:r,T,pcs};
         }
         let bass=null; if(bassPc>=0 && bassPc!==best.root && best.pcs.has(bassPc) && h[bassPc]>0.12*total) bass=bassPc;
-        const rs=chordRootSpell(best.root,key.fifths,diat), bs=bass!=null?spellRel(rs,bass-best.root,bass):null;
+        const rs=chordRootSpell(best.root,key.fifths,diat,best.T.suf), bs=bass!=null?spellRel(rs,bass-best.root,bass):null;
         list.push({step:a, root:best.root, suf:best.T.suf, kind:best.T.kind, pcs:[...best.pcs], bass, rs, bs,
           name:accName(rs)+best.T.suf+(bs?'/'+accName(bs):'')});
+        // 同一個和弦，第二拍低音轉咗做另一粒和弦音（例如 F♯ → F♯/A♯）：記低轉位
+        if(b-a===8){ const t=S+4, lowAt=x=>{ let lo=null; for(const n of fine) if(n.s<=x && n.e>x && n.e-n.s>=2 && n.pitch<60 && (!lo||n.pitch<lo.pitch)) lo=n; return lo; };
+          const l0=lowAt(S), l1=lowAt(t);
+          if(l0 && l1 && l1.s===t && l1.pitch%12!==l0.pitch%12 && best.pcs.has(l1.pitch%12) && l1.pitch%12!==best.root && l1.pitch<l0.pitch+3 && Math.abs(l1.pitch-l0.pitch)<=4){
+            const b2=l1.pitch%12, bs2=spellRel(rs,b2-best.root,b2); list.push({step:a+4, root:best.root, suf:best.T.suf, kind:best.T.kind, pcs:[...best.pcs], bass:b2, rs, bs:bs2, name:accName(rs)+best.T.suf+'/'+accName(bs2), inv:true}); } }
       }
       out.push(list);
     }
@@ -2512,6 +2531,8 @@ const Harm = (() => {
       ['subV',1,SUB,'sub',1.6,0], ['subV/ii',3,SUB,'sub',1.9,2], ['subV/V',8,SUB,'sub',1.6,7], ['subV/vi',10,SUB,'sub',1.7,9],
       ['#i°7',1,['dim7'],'pdim',0.9,2], ['#ii°7',3,['dim7'],'pdim',1,4], ['#iv°7',6,['dim7'],'pdim',0.9,7], ['#v°7',8,['dim7'],'pdim',1,9],
       ['iv',5,['m','m6','m7','madd9','m6/9'],'PD',0.8], ['bVI',8,['','maj7','add9','maj7#11'],'PD',1], ['bVII',10,['','add9','9','7','sus2'],'D',0.9,0],
+      // 周杰倫式常用：♯ivø7 經過和弦（A → G♯m7♭5 → G，低音半音落）、增三和弦（I+ 喺 vi → I/5 嘅半音下行低音入面；V+ → I）
+      ['#ivø',6,['m7b5'],'pdim',0.7,5], ['I+',0,['aug'],'T',0.8], ['V+',7,['aug'],'D',0.6,0],
       ['bIII',3,['','maj7','add9'],'T',1.3], ['iiø',2,['m7b5'],'PD',1], ['v',7,['m7','m9'],'PD',0.9,0], ['bII',1,['maj7','','maj7#11'],'PD',1.8],
     ],
     minor:[
@@ -2543,7 +2564,9 @@ const Harm = (() => {
         if(suf==='dim7') continue;
         if(third!=null && !suf.startsWith('sus') && suf!=='7sus4' && suf!=='9sus4' && suf!=='11') add({...base, bass:mod(root+third,12), bt:'3rd', bcost:0.3});
         if(fifth!=null && !(role==='sec'&&suf==='') && !suf.includes('sus') && suf!=='11' && cat<1.2) add({...base, bass:mod(root+fifth,12), bt:'5th', bcost:1.0});
-        if(sev!=null && !suf.includes('sus')) add({...base, bass:mod(root+sev,12), bt:'7th', bcost:0.45});
+        if(sev!=null && !suf.includes('sus')) add({...base, bass:mod(root+sev,12), bt:'7th', bcost:sev===11?1.1:0.45}); // 大七度喺低音（Gmaj7/F#）同上面根音撞小二度，少用
+        // 屬和弦三和弦都可以用 ♭7 做低音（例如 A/G：V 喺 IV 低音上面，之後低音落去 iii）
+        if(sev==null && (lab==='V'||lab==='V/V'||lab==='V/vi'||lab==='V/IV') && (suf===''||suf==='sus4')) add({...base, bass:mod(root+10,12), bt:'7th', bcost:0.55});
         if(six!=null) add({...base, bass:mod(root+six,12), bt:'6th', bcost:0.55});
         // 持續低音：IV/V、ii7/V（屬音低音），IV/I、bVII/I（主音低音）
         if(mode==='major' && (lab==='IV'||lab==='ii') && !suf.startsWith('m7b5')) add({...base, bass:mod(key.tonic+7,12), bt:'ped', bcost:0.4, role:'D', tgt:key.tonic, lab:lab+'/V'});
@@ -2556,25 +2579,30 @@ const Harm = (() => {
   /* ---------- 風格口味 ---------- */
   const ALLOW_POP=['','m','7','maj7','m7','sus4','7sus4','sus2','add9','madd9','6','m6','dim','dim7','m7b5','9','aug'];
   const PRESETS={
-    triad:{name:'三和弦（兒歌 / 聖誕歌 / 聖詩 / 古典）', cpx:0, chroma:0.3, orn:0, bassLine:0.15, variety:0.15, rate:1, stay:1.0, allow:['','m','7','dim'],
+    triad:{name:'三和弦（兒歌 / 聖誕歌 / 聖詩 / 古典）', tpl:0.2, cpx:0, chroma:0.3, orn:0, bassLine:0.15, variety:0.15, rate:1, stay:1.0, allow:['','m','7','dim'],
       pref:{'':.25, m:.15, '7':.05, dim:-.4}, moves:{'ii>V':.4,'IV>V':.35,'V>I':.25,'I>IV':.15,'I>V':.1,'vi>ii':.2,'V/V>V':.3,'iii>vi':.2,'vi>IV':.1}, style:{'Religious Music':.5,Pop:.3,Folk:.2}, decade:{1990:1}},
-    jay:{name:'周杰倫式・高階抒情', cpx:0.55, chroma:0.7, orn:0.55, bassLine:0.85, variety:0.35, rate:2,
-      pref:{add9:.25, maj7:.25, m7:.22, sus4:-.05, '7sus4':-.02, '9sus4':-.12, madd9:.12, '6/9':-.15, m9:.06, maj9:.05, '6':-.12, '13':-.08, '7#9':-.5, '7#11':-.3, 'maj7#11':-.15, '13b9':-.4, '11':-.15, m11:-.05, 'm6/9':-.2, '7#5':-.15, '7b13':-.1},
-      moves:{'IV>V':.35,'V>iii':.4,'iii>vi':.35,'vi>ii':.15,'ii>V':.3,'V>I':.3,'I>V':.15,'V>vi':.25,'IV>iv':.4,'iv>I':.35,'vi>iii':.25,'iii>IV':.3,'IV>iii':.2,'I>iii':.1,'ii>iii':.15,'bVII>I':.2,'bVI>bVII':.3,'V/vi>vi':.3,'V/ii>ii':.3,'V/IV>IV':.3,'V/V>V':.2,'I>V/IV':.15,'IV>V/vi':.2,'iii>V/ii':.15,'#iv°7>V':.2,'#i°7>ii':.2,'iv>V':.1,'bVI>V':.1},
+    jay:{name:'周杰倫式・高階抒情', tpl:0.7, cpx:0.4, chroma:0.7, orn:0.55, bassLine:0.85, variety:0.35, rate:2, color:0.9,
+      // 周杰倫琴譜實際用嘅和弦：三和弦、7、maj7、m7、add9、sus、6、m9、半減七、增、減七、轉位（少用 13、9sus4、7♯9 呢啲爵士和弦）
+      allow:['','m','7','maj7','m7','add9','madd9','sus4','7sus4','sus2','6','m6','m9','maj9','9','m7b5','dim7','aug','mmaj7','7b9'],
+      pref:{add9:.25, maj7:.25, m7:.22, sus4:-.05, '7sus4':-.02, '9sus4':-.12, madd9:.12, '6/9':-.15, m9:.06, maj9:.05, '6':0, aug:-.1, '13':-.08, '7#9':-.5, '7#11':-.3, 'maj7#11':-.15, '13b9':-.4, '11':-.15, m11:-.05, 'm6/9':-.2, '7#5':-.15, '7b13':-.1},
+      moves:{'IV>V':.35,'V>iii':.4,'iii>vi':.35,'vi>ii':.15,'ii>V':.3,'V>I':.3,'I>V':.15,'V>vi':.25,'IV>iv':.4,'iv>I':.35,'vi>iii':.25,'iii>IV':.3,'IV>iii':.45,'I>iii':.1,'ii>iii':.15,'bVII>I':.2,'bVI>bVII':.3,'V/vi>vi':.4,'V/ii>ii':.3,'V/IV>IV':.3,'V/V>V':.2,'I>V/IV':.15,'IV>V/vi':.2,'iii>V/ii':.15,'#iv°7>V':.2,'#i°7>ii':.2,'iv>V':.1,'bVI>V':.1,
+        // 《說了再見》學返嚟：ii → V/vi（Em → F♯ → F♯/A♯）→ vi；vi7 → I/5 → V/V/3 → iiø/3 → iii（低音 B–A–G♯–G–F♯ 半音落）；
+        // V → ♯ivø7 → IV → V/4 → iii（A → G♯m7♭5 → G → A/G → F♯m）；vi → I+/♯5 → I/5 → V/V/3（line cliché）
+        'ii>V/vi':.35,'vi>I':.2,'I>V/V':.25,'V/V>iiø':.45,'iiø>iii':.45,'V>#ivø':.45,'#ivø>IV':.5,'vi>I+':.45,'I+>I':.5,'I>V/vi':.2,'iiø>V':.3,'V/vi>V/V':.15},
       style:{Pop:.55,'R&B, Funk & Soul':.45}, decade:{2000:.6,2010:.4}},
-    rnb:{name:'R&B / Neo-Soul', cpx:0.8, chroma:0.5, orn:0.35, bassLine:0.4, variety:0.4, rate:2,
+    rnb:{name:'R&B / Neo-Soul', tpl:0.35, cpx:0.8, chroma:0.5, orn:0.35, bassLine:0.4, variety:0.4, rate:2, color:0.8,
       pref:{maj9:.3, m9:.3, '9':.2, '13':.2, m11:.28, '9sus4':.22, '6/9':.15, maj7:.12, m7:.12, '':-.35, m:-.35, sus4:-.2, sus2:-.1, add9:-.05, '7#9':.0, '7#11':-.1},
       moves:{'ii>V':.3,'IV>iii':.3,'iii>vi':.3,'vi>ii':.25,'IV>V':.2,'I>IV':.15}, style:{'R&B, Funk & Soul':.8,Pop:.2}, decade:{2010:.6,2000:.4}},
-    jazz:{name:'爵士 Ballad', cpx:0.85, chroma:0.75, orn:0.6, bassLine:0.35, variety:0.45, rate:2,
+    jazz:{name:'爵士 Ballad', tpl:0.25, cpx:0.85, chroma:0.75, orn:0.6, bassLine:0.35, variety:0.45, rate:2, color:0.8,
       pref:{maj7:.22, m7:.22, '7':.1, '13':.2, '7b9':.2, '7#11':.15, m7b5:.2, '6/9':.18, m9:.15, maj9:.12, '7b13':.1, '':-.45, m:-.45, add9:-.25, madd9:-.2, sus2:-.3, sus4:-.2},
       moves:{'ii>V':.5,'V>I':.35,'iii>vi':.25,'vi>ii':.3,'I>vi':.15}, style:{Jazz:1}, decade:{1960:.5,2000:.5}},
-    pop:{name:'流行抒情（清新）', cpx:0.3, chroma:0.25, orn:0.2, bassLine:0.5, variety:0.3, rate:2, stay:0.25, allow:ALLOW_POP,
+    pop:{name:'流行抒情（清新）', tpl:0.55, cpx:0.3, chroma:0.25, orn:0.2, bassLine:0.5, variety:0.3, rate:2, stay:0.25, allow:ALLOW_POP,
       pref:{add9:.12, '':.1, m:.1, sus4:-.12, sus2:-.3, '7sus4':-.1, '9sus4':-.2, '6/9':-.2, maj7:.05, m7:.05, '13':-.4, '7#9':-.8, '7#11':-.6, 'maj7#11':-.5, '7b9':-.3, '13b9':-.8, m11:-.3, '11':-.3, '7#5':-.5, '7b13':-.4, 'm6/9':-.4},
       moves:{'IV>V':.25,'V>vi':.2,'vi>IV':.2,'I>V':.15,'V>I':.25}, style:{Pop:1}, decade:{2010:1}},
-    cn:{name:'中國風（五聲）', cpx:0.25, chroma:0.05, orn:0.05, bassLine:0.5, variety:0.3, rate:2, stay:0.25, allow:ALLOW_POP,
+    cn:{name:'中國風（五聲）', tpl:0.45, cpx:0.25, chroma:0.05, orn:0.05, bassLine:0.5, variety:0.3, rate:2, stay:0.25, allow:ALLOW_POP,
       pref:{add9:.2, sus2:.22, sus4:.15, m7:.1, madd9:.1, '7':-.5, '9':-.5, '13':-.9, dim7:-.7, m7b5:-.6, '7b9':-.9, '7#9':-.9, '7#11':-.9, 'maj7#11':-.6, '6':-.2},
       moves:{'vi>IV':.2,'IV>V':.25,'V>I':.2,'vi>iii':.2,'iii>IV':.2,'V>vi':.2}, style:{Pop:.5,'World Music':.3,Folk:.2}, decade:{2000:.5,2010:.5}},
-    simple:{name:'簡單（三和弦為主）', cpx:0, chroma:0, orn:0, bassLine:0.2, variety:0.2, rate:1, stay:0.6, allow:['','m','7','sus4','dim'],
+    simple:{name:'簡單（三和弦為主）', tpl:0.35, cpx:0, chroma:0, orn:0, bassLine:0.2, variety:0.2, rate:1, stay:0.6, allow:['','m','7','sus4','dim'],
       pref:{'':.3, m:.3, '7':.1}, moves:{'IV>V':.2,'V>I':.3}, style:{Pop:1}, decade:{1990:1}},
   };
 
@@ -2598,12 +2626,13 @@ const Harm = (() => {
     const set=new Set(st.pcs); let sw=0, sc=0;
     const I=new Set(iv(st.suf).map(x=>mod(x,12)));
     for(const n of ns){ const rel=mod(n.pc-st.root,12); let v;
-      if(set.has(n.pc)){ v=1; const core=[0,3,4,7,6,8].includes(rel)||(rel===10||rel===11)&&I.has(rel); if(!core) v+=0.3*P.cpx; } // 旋律落喺延伸音（9、11、13）＝有色彩
+      if(set.has(n.pc)){ v=1; const core=[0,3,4,7,6,8].includes(rel)||(rel===10||rel===11)&&I.has(rel);
+        if(!core) v= P.color ? 0.6+0.25*P.cpx : v+0.3*P.cpx; } // 旋律落喺延伸音（9、11、13）：色彩口味唔好俾「大和弦食晒所有音」佔便宜
       else {
         const avoid=st.pcs.some(c=>mod(n.pc-c,12)===1) || (st.bass!==st.root && mod(n.pc-st.bass,12)===1) || ((rel===3||rel===4) && !I.has(3) && !I.has(4)); // 掛留和弦唱三度 = 撞
         if(avoid) v= n.strong ? -1.3 : -0.35;
-        else { const tension=[2,9].includes(rel) || (rel===5 && I.has(3)) || (rel===6 && (isDom(st.suf)||st.suf.startsWith('maj')));
-          v= n.strong ? (tension ? -0.15+0.35*P.cpx : -0.7) : (tension ? 0.1 : -0.05); }
+        else { const tension=[2,9].includes(rel) || (rel===5 && I.has(3)) || (rel===6 && (isDom(st.suf)||st.suf.startsWith('maj'))) || (P.color && rel===11 && I.has(4) && !I.has(10));
+          v= n.strong ? (tension ? (P.color ? 0.45*P.color : -0.15+0.35*P.cpx) : -0.7) : (tension ? (P.color?0.3:0.1) : -0.05); }
       }
       // 和弦入面有粒音同長嘅旋律音撞小九度（旋律喺上、和弦音低半音嘅情況已經計咗；呢度計和弦音高半音）
       sw+=n.w; sc+=n.w*v; }
@@ -2613,10 +2642,30 @@ const Harm = (() => {
   /* ---------- 打分 ---------- */
   // 重拍音規則：span.must = 重拍（同埋和弦開始嗰下）響緊嘅旋律音；一定要係和弦骨幹音
   function mustMiss(span, st){ const c=st.core||coreOf(st.root,st.suf); let k=0; for(const pc of span.must||[]) if(!c.includes(pc)) k++; return k; }
+  // 色彩音（周杰倫式）：重拍旋律音唔一定係三和弦音 —— 可以係 9、大七、6、小和弦嘅 11（延伸音），
+  // 掛留 4（11 喺大和弦上面，之後落返 3）就扣多少少分；真正撞嘅音（♭9 等）照樣唔准。
+  // 回傳：0 = 和弦音；正數 = 罰分；Infinity = 唔准
+  function colorCost(pc, st, scale){ const c=st.core||coreOf(st.root,st.suf); if(c.includes(pc)) return 0;
+    const rel=mod(pc-st.root,12), I=new Set(iv(st.suf).map(x=>mod(x,12))), maj3=I.has(4), min3=I.has(3), dom=I.has(10)&&maj3, m7b5=st.suf==='m7b5', dim=st.suf.startsWith('dim'), aug=st.suf==='aug'||st.suf==='7#5';
+    if(dim||aug) return Infinity;
+    if(st.bass!==st.root && mod(pc-st.bass,12)===1) return Infinity;           // 同低音撞小九度
+    if(rel===2) return m7b5?0.5:0.15;                                           // 9（半減七加 9 = ø9，爵士 / 周杰倫都用）
+    if(maj3 && !dom && rel===6 && scale && scale.has(pc)) return 0.4;            // ♯11（IV 和弦嘅 Lydian 色彩，例如 G 加 C♯）
+    if(maj3 && !dom && rel===11) return 0.2;                                     // 大七（G 加 F♯）
+    if(maj3 && rel===9) return 0.2;                                              // 6 / 13
+    if((min3||m7b5) && rel===5) return 0.2;                                      // 小和弦 11
+    if(min3 && !m7b5 && rel===10) return 0.15;                                   // 小和弦 ♭7
+    if(min3 && rel===9) return 0.6;                                              // 小和弦 6（Dorian）
+    if(maj3 && rel===5) return 0.9;                                              // 掛留 4（倚音）
+    if(st.suf.startsWith('sus') && (rel===9||rel===10||rel===11&&!dom)) return 0.3;
+    return Infinity; }
+  function mustCost(span, st, P){ const col=P.color||0; let miss=0, pen=0;
+    for(const pc of span.must||[]){ const v=col>0?colorCost(pc,st,P._scale):((st.core||coreOf(st.root,st.suf)).includes(pc)?0:Infinity); if(v===Infinity) miss++; else pen+=v*(1.6-col); }
+    return {miss, pen}; }
   const mustOK=(span,st)=>mustMiss(span,st)===0;
   function unary(span, st, ctx){
     const {P, key}=ctx; const ns=span.ns;
-    const miss=ctx.strict!==false?mustMiss(span,st):0;
+    const mc=ctx.strict!==false?mustCost(span,st,P):{miss:0,pen:0}, miss=mc.miss;
     const {f,w}=fit(ns, st, P);
     let u=3.2*f*Math.min(1.25, 0.45+w/2.5);
     // 複雜程度：同目標差太遠扣分
@@ -2633,7 +2682,8 @@ const Harm = (() => {
     if(span.last) u+= st.rel===0 && (st.lab==='I'||st.lab==='i') && st.bt==='root' && !isDom(st.suf) ? 3 : -2;
     else if(span.cad) u+= st.rel===0 && st.role==='T' && st.bt==='root' ? 0.55 : st.lab==='V'||st.lab==='IV/V'||st.lab==='ii/V' ? 0.35 : st.lab==='vi'||st.lab==='IV'||st.lab==='bVI' ? 0.15 : st.bt==='7th'||st.bt==='5th' ? -0.4 : 0;
     if(st.suf==='mmaj7' || st.bt==='6th') u-=0.25; // 只係半音下行低音先用
-    if(ctx.strict!==false && span.soft && span.soft.length){ const c=st.core||coreOf(st.root,st.suf); for(const pc of span.soft) if(!c.includes(pc)) u-=1.6; }
+    if(ctx.strict!==false && span.soft && span.soft.length){ const c=st.core||coreOf(st.root,st.suf); for(const pc of span.soft) if(!c.includes(pc)){ const v=P.color?colorCost(pc,st,P._scale):Infinity; u-= v===Infinity?1.6:0.25+v; } }
+    u-=mc.pen;
     // 終止式（ii–V–I）：樂句尾前一格鍾意屬和弦（V / V7），再前一格鍾意下屬（ii / IV）
     if(span.pre1 && (st.lab==='V'||st.lab==='ii/V'||st.lab==='IV/V') && st.bt!=='5th') u+=0.3;
     if(span.pre2 && (st.lab==='ii'||st.lab==='IV'||st.lab==='iiø'||st.lab==='iv'||st.lab==='V/V')) u+=0.35;
@@ -2654,6 +2704,7 @@ const Harm = (() => {
       else if(a.role==='sec' && rm===5) v+=0.45;                     // 落五度（連鎖副屬）
       else if(a.role==='sec' && a.tgt!=null && b.root===mod(a.tgt+9,12) ) v+=0.1; // 假終止
       else if(a.role==='pdim' && mod(b.bass-a.root,12)===1) v+=0.6;
+      else if(a.role==='pdim' && mod(a.bass-b.bass,12)===1) v+=0.7;          // 低音半音落（G♯m7♭5 → G）
       else if(a.role==='sub' && rm===11) v+=0.4;
       else if(a.suf==='' && a.role==='sec') v-=1.1;
       else v-= a.role==='sec'?1.5:1.7;
@@ -2709,6 +2760,7 @@ const Harm = (() => {
     spans.forEach((s,i)=>{ if(s.cad||s.last){ if(spans[i-1]&&!spans[i-1].cad) spans[i-1].pre1=true; if(spans[i-2]&&!spans[i-2].cad&&!(spans[i-1]&&spans[i-1].cad)) spans[i-2].pre2=true; } });
     const states=buildStates(key, P.allow?new Set(P.allow):null);
     const scale=new Set((key.mode==='minor'?[0,2,3,5,7,8,10,11]:[0,2,4,5,7,9,11]).map(i=>(i+key.tonic)%12));
+    P._scale=scale;
     return {mel, key, B, P, per, L, spans, states, scale, bars, strongQ:strong, strict:o.strict!==false, allow:P.allow?new Set(P.allow):null};
   }
   function viterbi(ctx, opt={}){
@@ -2811,8 +2863,56 @@ const Harm = (() => {
     {id:'soft', zh:'優雅（含蓄）', d:{cpx:-0.2, chroma:-0.25, orn:-0.2}},
     {id:'bold', zh:'大膽（多離調）', d:{cpx:+0.25, chroma:+0.35, orn:+0.3, variety:+0.3}},
     {id:'alt', zh:'另一個諗法', d:{variety:+0.2}, noise:0.3},
+    {id:'tpl', zh:'經典進行（4-3-6-2-5-1 等）', d:{tpl:+0.6, orn:-0.15}},
   ];
   const clamp01=x=>Math.max(0,Math.min(1,x));
+  /* ---------- 經典和弦進行範本（用 C 大調 / A 小調寫；每粒 = 半小節；自動移去而家個調）----------
+     周杰倫同華語流行曲成日重用幾套進行：每個樂句試吓套落去，夾旋律（重拍音規則照用）先用，用咗就喺解釋度話你知 */
+  const TEMPLATES=[
+    {id:'k436', zh:'4-3-6-2-5-1（周杰倫最愛）', mode:'major', s:'F F | Em Am | Dm G | C C'},
+    {id:'k4536', zh:'4-5-3-6-2-5-1', mode:'major', s:'F G | Em Am | Dm G | C C'},
+    {id:'k4536s', zh:'4-5-3-6（帶副屬 VI7）', mode:'major', s:'F G | Em A7 | Dm G7 | C C'},
+    {id:'canon', zh:'卡農（低音級進落）', mode:'major', s:'C G/B | Am Em/G | F C/E | Dm7 G'},
+    {id:'k1645', zh:'1-6-4-5', mode:'major', s:'C C | Am Am | F F | G G'},
+    {id:'k6415', zh:'6-4-1-5', mode:'major', s:'Am Am | F F | C C | G G'},
+    {id:'k1564', zh:'1-5-6-4', mode:'major', s:'C C | G G | Am Am | F F'},
+    {id:'k4321', zh:'4-3-2-1（級進落）', mode:'major', s:'F F | Em Em | Dm Dm | C C'},
+    {id:'k1345', zh:'1-3-4-5', mode:'major', s:'C C | Em Em | F F | G G'},
+    {id:'lc', zh:'半音下行低音（6 → 1+/♯5 → 1/5 → V/V/3）', mode:'major', s:'Am Am | Caug/G# Caug/G# | C/G C/G | D/F# D/F#'},
+    {id:'sy1', zh:'《說了再見》主歌：4-3-6-2-V/vi-6-1/5-V/V/3-iiø/3', mode:'major', s:'F F6 | Em7 Am | Dm9 E | Am7 C/G | D/F# Dm7b5/F | Em Am7 | Dm G7 | C C'},
+    {id:'sy2', zh:'《說了再見》副歌：2-5-♯ivø-4-5/4-3-6', mode:'major', s:'Dm Dm | G F#m7b5 | F G/F | Em Am | Dm E | Am7 C/G | D/F# Dm7b5/F | Em Am'},
+    {id:'m1', zh:'小調 i-VI-VII-III', mode:'minor', s:'Am Am | F F | G G | C C'},
+    {id:'m2', zh:'小調 i-iv-V-i', mode:'minor', s:'Am Am | Dm Dm | E E | Am Am'},
+    {id:'m3', zh:'小調低音級進落（i-i/♭7-VI-V）', mode:'minor', s:'Am Am/G | F F | E E | Am Am'},
+  ];
+  function tplStates(ctx, T){ const off=T.mode==='minor'?mod(ctx.key.tonic-9,12):mod(ctx.key.tonic,12);
+    let list=T.s.split(/\s+/).filter(x=>x && x!=='|').map(t=>A.parseChord(t)); if(list.some(c=>!c)) return null;
+    if(ctx.per===1) list=list.filter((_,i)=>i%2===0); else if(ctx.per!==2) return null;
+    return list.map(c=>stateFor(ctx, mod(c.root+off,12), c.suf, mod((c.bass??c.root)+off,12))); }
+  // 喺 Viterbi 揀咗嘅路上面，逐段試套範本：夾得過（加埋口味分）先用；用加權區間排程揀唔重疊嘅最好組合
+  const triQ=suf=>/^m7b5|^dim/.test(suf)?'d':/^aug|#5/.test(suf)?'a':/^sus|7sus|9sus/.test(suf)?'s':/^m(?!aj)/.test(suf)?'m':'M';
+  function applyTemplates(ctx, path, w, skip){
+    if(!w) return {path, used:[]};
+    const vcache=new Map();
+    const variantsOf=st=>{ let v=vcache.get(st.key); if(v) return v; const q=triQ(st.suf);
+      v=ctx.states.filter(x=>x.root===st.root && x.bass===st.bass && triQ(x.suf)===q && (q!=='d'||x.suf===st.suf)); if(!v.some(x=>x.key===st.key)) v.push(st); vcache.set(st.key,v); return v; };
+    const N=path.length, sp=ctx.spans, mode=ctx.key.mode==='minor'?'minor':'major';
+    const U=(i,st)=>unary(sp[i],st,ctx), Tr=(a,b,i)=>trans(a,b,ctx,sp[i].bar===sp[i-1].bar);
+    const free=(i0,i1)=>{ let s=0; for(let i=i0;i<i1;i++){ s+=U(i,path[i]); if(i>i0) s+=Tr(path[i-1],path[i],i); } return s; };
+    const byEnd=new Map();
+    for(const T of TEMPLATES){ if(T.mode!==mode || (skip && skip.has(T.id))) continue; const full=tplStates(ctx,T); if(!full) continue;
+      const vars=[full]; if(full.length>=16) vars.push(full.slice(0,full.length/2), full.slice(full.length/2));
+      for(const sts of vars){ const L=sts.length;
+        for(let i0=0;i0+L<=N;i0+=ctx.per){ let s=0, ok=true; const pick=[];
+          // 範本定根音、大細三和弦同低音；每格自己揀最夾旋律嘅色彩（G → Gmaj7 / G6 / Gadd9…）
+          for(let k=0;k<L;k++){ let bestSt=null, bu=-1e9; for(const v of variantsOf(sts[k])){ const u=U(i0+k,v); if(u>bu){ bu=u; bestSt=v; } }
+            if(bu<-15){ ok=false; break; } pick.push(bestSt); s+=bu; if(k) s+=Tr(pick[k-1],pick[k],i0+k); }
+          if(!ok) continue; const gain=s-free(i0,i0+L)+w*L;
+          if(gain>0){ const c={i0, i1:i0+L, sts:pick, gain, T}; if(!byEnd.has(c.i1)) byEnd.set(c.i1,[]); byEnd.get(c.i1).push(c); } } } }
+    const best=Array(N+1).fill(0), pick=Array(N+1).fill(null);
+    for(let i=1;i<=N;i++){ best[i]=best[i-1]; for(const c of byEnd.get(i)||[]){ const v=best[c.i0]+c.gain; if(v>best[i]){ best[i]=v; pick[i]=c; } } }
+    const out=path.slice(), used=[]; let i=N; while(i>0){ const c=pick[i]; if(c && best[i]!==best[i-1]){ for(let k=0;k<c.sts.length;k++) out[c.i0+k]=c.sts[k]; used.push({q0:sp[c.i0].q0, q1:sp[c.i1-1].q1, id:c.T.id, zh:c.T.zh}); i=c.i0; } else i--; }
+    return {path:out, used:used.reverse()}; }
   function harmonize(melIn, o){
     const out=[]; const avoid=[];
     const base=prepare(melIn,o);
@@ -2821,15 +2921,33 @@ const Harm = (() => {
       const P={...base.P}; for(const k in V.d) P[k]=clamp01(P[k]+V.d[k]);
       const ctx={...base, P}; const r=rng((o.seed||11)+vi*7919);
       const lock=(o.locks||[]).length? base.spans.map(s=>{ const l=o.locks.find(e=>e.q0<s.q1-1e-6 && e.q1>s.q0+1e-6); return l?l.st:null; }):[];
-      const {path}=viterbi(ctx,{seed:(o.seed||11)+vi*31, noise:(V.noise||0)+(o.noise||0), avoid, avoidW:vi?0.55:0, lock});
+      let {path}=viterbi(ctx,{seed:(o.seed||11)+vi*31, noise:(V.noise||0)+(o.noise||0), avoid, avoidW:vi?0.55:0, lock});
+      // 經典進行範本（鎖住咗嘅和弦唔郁）
+      const tp=lock.some(Boolean)?{path, used:[]}:applyTemplates(ctx, path, P.tpl||0, o.tplSkip); path=tp.path;
       path.forEach((st,i)=>{ (avoid[i]=avoid[i]||new Set()).add(st.key); });
       let ev=toEvents(ctx, repeatBars(ctx,path,r));
       if(o.locks && o.locks.length) ev=mergeLocks(ev, o.locks);
       ev=ornament(ctx, ev, r, P.orn);
-      out.push({id:V.id, zh:V.zh, events:finish(ctx, ev), score:pathScore(ctx,path), path, P});
+      out.push({id:V.id, zh:V.zh, events:finish(ctx, ev), score:pathScore(ctx,path), path, P, templates:tp.used});
     });
     return {versions:out, ctx:base};
   }
+  // 中途轉調：segs=[{q0,q1,key}]，每段用自己個調配，再駁返埋（例如 D 大調 → 升半音去 E♭）
+  function harmonizeKeys(melIn, o, segs){
+    segs=(segs||[]).filter(g=>g.q1>g.q0+1e-6); if(segs.length<2) return harmonize(melIn,o);
+    const B=o.B||4, parts=[];
+    for(const g of segs){ const m=melIn.filter(n=>n.qs>=g.q0-1e-6 && n.qs<g.q1-1e-6).map(n=>({...n, qs:n.qs-g.q0, qe:Math.min(n.qe,g.q1)-g.q0}));
+      if(!m.length) continue; const db=Math.round(g.q0/B), o2={...o, key:g.key};
+      let locks=(o.locks||[]).filter(l=>l.q0>=g.q0-1e-6 && l.q0<g.q1-1e-6);
+      if(locks.length){ const c=prepare(m,o2); locks=locks.map(l=>({q0:l.q0-g.q0, q1:Math.min(l.q1,g.q1)-g.q0, bar:l.bar-db, st:stateFor(c,l.st.root,l.st.suf,l.st.bass)})); }
+      o2.locks=locks; parts.push({g, db, r:harmonize(m,o2)}); }
+    if(!parts.length) return harmonize(melIn,o);
+    const sh=(e,p)=>({...e, q0:e.q0+p.g.q0, q1:e.q1+p.g.q0, bar:e.bar+p.db, key:p.g.key});
+    const versions=parts[0].r.versions.map((v,vi)=>({id:v.id, zh:v.zh, P:v.P,
+      events:parts.flatMap(p=>p.r.versions[vi].events.map(e=>sh(e,p))),
+      templates:parts.flatMap(p=>(p.r.versions[vi].templates||[]).map(t=>({...t, q0:t.q0+p.g.q0, q1:t.q1+p.g.q0}))),
+      score:parts.reduce((a,p)=>a+p.r.versions[vi].score,0)}));
+    return {versions, ctx:parts[0].r.ctx, parts}; }
   function mergeLocks(ev, locks){
     const out=[];
     for(const e of ev){ let segs=[[e.q0,e.q1]];
@@ -2950,7 +3068,7 @@ const Harm = (() => {
     }
     return out;
   }
-  return {PATTERNS, accomp, PRESETS, VERSIONS, DEV, CPX, roman, coreOf, mustOK, mustFor:Harm_must, harmonize, alternatives, prepare, stateFor, notesIn, fit, unary, trans, pcsOf, buildStates, pathScore, viterbi, finish, toEvents, ornament};
+  return {colorCost, harmonizeKeys, TEMPLATES, applyTemplates, PATTERNS, accomp, PRESETS, VERSIONS, DEV, CPX, roman, coreOf, mustOK, mustFor:Harm_must, harmonize, alternatives, prepare, stateFor, notesIn, fit, unary, trans, pcsOf, buildStates, pathScore, viterbi, finish, toEvents, ornament};
 })();
 if(typeof module!=='undefined'){ module.exports.Harm=Harm; }
 /* ==HARM END== */
@@ -4418,7 +4536,7 @@ const HumUI=(()=>{
   const PCF={0:0,7:1,2:2,9:3,4:4,11:5,6:6,1:-5,8:-4,3:-3,10:-2,5:-1};
   const majKey=t=>{ const k={tonic:t, mode:'major', fifths:PCF[t]}; k.name=Core.keyName(k); return k; };
   const spellFor=key=>{ const tm=((key.fifths*7)%12+12)%12, diat=new Set([0,2,4,5,7,9,11].map(i=>(i+tm)%12));
-    return {root:(pc,f)=>Core.chordRootSpell(pc,f,diat), rel:(rs,iv,pc)=>Core.spellRel(rs,((iv%12)+12)%12,pc)}; };
+    return {root:(pc,f,suf)=>Core.chordRootSpell(pc,f,diat,suf), rel:(rs,iv,pc)=>Core.spellRel(rs,((iv%12)+12)%12,pc)}; };
   // 伴奏：用自動編曲引擎，按揀咗嘅風格同和弦進行生成成首（最多 5 分鐘）嘅伴奏，再逐少逐少排程播放
   async function prepBacking(bpm){
     const style=$('hmBack').value, kt=+$('hmKey').value, key=majKey(kt), pv=$('hmProg').value;
@@ -4970,8 +5088,8 @@ const ArrUI=(()=>{
   const HQ={res:null, vers:null, ver:0, sel:-1, inp:null, seed:11, sig:''};
   const STYLE_PRESET={jay:'jay', jayrnb:'rnb', bossa:'jazz', ballad:'pop', jaycn:'cn', rock:'simple', waltz:'pop', classical:'simple'};
   const spellOf=key=>{ const tm=((key.fifths*7)%12+12)%12, diat=new Set([0,2,4,5,7,9,11].map(i=>(i+tm)%12));
-    return {root:(pc,f)=>Core.chordRootSpell(pc,f,diat), rel:(rs,iv,pc)=>Core.spellRel(rs,((iv%12)+12)%12,pc)}; };
-  function cName(c,key){ const sp=spellOf(key), rs=sp.root(c.root,key.fifths), bs=c.bass!==c.root?sp.rel(rs,c.bass-c.root,c.bass):null;
+    return {root:(pc,f,suf)=>Core.chordRootSpell(pc,f,diat,suf), rel:(rs,iv,pc)=>Core.spellRel(rs,((iv%12)+12)%12,pc)}; };
+  function cName(c,key){ const sp=spellOf(key), rs=sp.root(c.root,key.fifths,c.suf), bs=c.bass!==c.root?sp.rel(rs,c.bass-c.root,c.bass):null;
     const a=x=>x.step+(x.alter===1?'#':x.alter===-1?'b':''); return a(rs)+(Arranger.SUF_DISP[c.suf]??c.suf)+(bs?'/'+a(bs):''); }
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const WHY={dia:'調內和弦：用返呢個調本身嘅和弦，加咗延伸音（add9、maj7、9…）令佢有色彩。',
@@ -5029,7 +5147,7 @@ const ArrUI=(()=>{
   function hqRelabel(){ const evs=HQ.vers[HQ.ver]; HQ.vers[HQ.ver]=Harm.finish(HQ.res.ctx, evs.map(e=>({q0:e.q0,q1:e.q1,bar:e.bar,st:e.st,orn:e.orn,locked:e.locked}))); }
   function hqRender(){
     if(!HQ.res){ $('hqOut').hidden=true; return; } $('hqOut').hidden=false;
-    $('hqTabs').innerHTML=HQ.res.versions.map((v,i)=>`<button class="hqtab ${i===HQ.ver?'on':''}" data-v="${i}">${esc(v.zh)}${v.ai?`<small>AI 順耳度 ${(Math.exp(v.ai.avg)*100).toFixed(0)}%</small>`:''}</button>`).join('');
+    $('hqTabs').innerHTML=HQ.res.versions.map((v,i)=>`<button class="hqtab ${i===HQ.ver?'on':''}" data-v="${i}" title="${esc((v.templates||[]).length?'用咗嘅經典進行：'+[...new Set(v.templates.map(t=>t.zh))].join('、'):'')}">${esc(v.zh)}${v.ai?`<small>AI 順耳度 ${(Math.exp(v.ai.avg)*100).toFixed(0)}%</small>`:''}</button>`).join('');
     $('hqTabs').querySelectorAll('.hqtab').forEach(b=>b.onclick=()=>{ HQ.ver=+b.dataset.v; HQ.sel=-1; hqClosePop(); hqRender(); });
     const evs=HQ.vers[HQ.ver], key=HQ.inp.key; const nb=Math.max(...evs.map(e=>e.bar))+1; let h='';
     for(let b=0;b<nb;b++){ h+=`<div class="hqbar"><span class="hqbn">${b+1}</span>`;
@@ -5166,7 +5284,7 @@ const ChordUI=(()=>{
   const keyObj=(tonic,mode)=>{ const f=mode==='minor'?PCF[(tonic+3)%12]:PCF[tonic]; const k={tonic, mode, fifths:f}; k.name=Core.keyName(k); return k; };
   const tonicOf=k=>{ const maj=((k.fifths*7)%12+12)%12; return k.mode==='minor'?(maj+9)%12:maj; };
   const spellOf=key=>{ const tm=((key.fifths*7)%12+12)%12, diat=new Set([0,2,4,5,7,9,11].map(i=>(i+tm)%12));
-    return {root:(pc,f)=>Core.chordRootSpell(pc,f,diat), rel:(rs,iv,pc)=>Core.spellRel(rs,((iv%12)+12)%12,pc)}; };
+    return {root:(pc,f,suf)=>Core.chordRootSpell(pc,f,diat,suf), rel:(rs,iv,pc)=>Core.spellRel(rs,((iv%12)+12)%12,pc)}; };
   const nm=x=>x.step+(x.alter===1?'#':x.alter===-1?'b':'');
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const CH={pts:[], sel:null, backup:null, ctx:null};
@@ -5195,17 +5313,27 @@ const ChordUI=(()=>{
   let I=null;
   function slotQ(){ const r=$('chRate').value; return r==='beat'?I.beatQ:r==='half'?(I.B%2===0&&!I.compound?I.B/2:(I.compound?I.B/2:I.B)):I.B; }
   function curKey(){ const [t,m]=$('chKey').value.split(':'); return keyObj(+t,m); }
-  function prep(){ const key=curKey(); CH.key=key;
+  // 譜入面有轉調（例如 D → E♭）而你冇自己改「調」→ 每段用返嗰段嘅調
+  function segs(){ const k0=curKey(), out=[{q0:0, key:k0}];
+    if(I && $('chKey').value===I.key.tonic+':'+I.key.mode){
+      for(const b of Object.keys(S.keyCh||{}).map(Number).sort((x,y)=>x-y)){ if(b<=0 || b>=I.nb) continue; const kc=S.keyCh[b], m=kc.mode||k0.mode;
+        const maj=((kc.fifths*7)%12+12)%12, k=keyObj(m==='minor'?(maj+9)%12:maj, m); if(k.tonic===out[out.length-1].key.tonic && k.mode===out[out.length-1].key.mode) continue; out.push({q0:b*I.B, key:k}); } }
+    out.forEach((g,i)=>g.q1=i+1<out.length?out[i+1].q0:endQ()); return out; }
+  function keyAt(q){ let k=curKey(); for(const g of segs()) if(q>=g.q0-1e-6) k=g.key; return k; }
+  function prep(q){ const key=q==null?curKey():keyAt(q); CH.key=key;
     CH.ctx=Harm.prepare(I.notes,{key, B:I.B, preset:$('chPreset').value, slotQ:slotQ(), strict:$('chStrict').checked, strongQ:I.strongQ, compound:I.compound}); return CH.ctx; }
   const endQ=()=>I.nb*I.B;
   // 和弦轉換點 → 事件
   function events(pts=CH.pts){ const p=pts.slice().sort((a,b)=>a.q-b.q), E=endQ();
     return p.map((c,i)=>({q0:c.q, q1:i+1<p.length?p[i+1].q:E, bar:Math.floor(c.q/I.B+1e-9), root:c.root, suf:c.suf, bass:c.bass, src:c.src, tmp:c.tmp, st:Harm.stateFor(CH.ctx,c.root,c.suf,c.bass)})).filter(e=>e.q1>e.q0+1e-6); }
-  function cName(c){ const key=CH.key, sp=spellOf(key), rs=sp.root(c.root,key.fifths), bs=c.bass!==c.root?sp.rel(rs,c.bass-c.root,c.bass):null;
+  function cName(c, key=(c.q0!=null?keyAt(c.q0):CH.key)){ const sp=spellOf(key), rs=sp.root(c.root,key.fifths,c.suf), bs=c.bass!==c.root?sp.rel(rs,c.bass-c.root,c.bass):null;
     return nm(rs)+(Arranger.SUF_DISP[c.suf]??c.suf)+(bs?'/'+nm(bs):''); }
   const NOTE_S=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'], NOTE_F=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
   const noteName=p=>(CH.key.fifths<0?NOTE_F:NOTE_S)[mod(p,12)];
-  function check(e){ const m=Harm.mustFor(CH.ctx,e), core=Harm.coreOf(e.root,e.suf); return {must:m.must, miss:m.must.filter(pc=>!core.includes(pc))}; }
+  // 重拍音唔喺骨幹：用「周杰倫 / R&B / 爵士」時，9、maj7、6、11 呢啲色彩音當係故意（橙色），真係撞先係紅色
+  function check(e){ const m=Harm.mustFor(CH.ctx,e), core=Harm.coreOf(e.root,e.suf), miss0=m.must.filter(pc=>!core.includes(pc));
+    const P=CH.ctx&&CH.ctx.P, st=e.st||{root:e.root,suf:e.suf,bass:e.bass}; const colorOK=pc=>!!(P&&P.color) && isFinite(Harm.colorCost(pc,st,P._scale));
+    return {must:m.must, miss:miss0.filter(pc=>!colorOK(pc)), col:miss0.filter(colorOK)}; }
 
   /* ---- 網格 ---- */
   function render(){
@@ -5217,21 +5345,21 @@ const ChordUI=(()=>{
         const ns=I.notes.filter(n=>n.qs>=q-1e-6 && n.qs<q1-1e-6);
         const held=I.notes.find(n=>n.qs<q-1e-6 && n.qe>q+1e-6);
         const sel=CH.sel!=null && Math.abs(CH.sel-q)<1e-6;
-        let chip=starts.map(e=>{ const c=check(e); return `<span class="chchip ${c.miss.length?'bad':'ok'} src-${e.src}" title="${c.miss.length?'重拍音 '+c.miss.map(noteName).join('、')+' 唔喺呢個和弦入面':'重拍音全部係和弦音'}">${esc(cName(e))}<small>${esc(Harm.roman(CH.key,e.root,e.suf))}</small></span>`; }).join('');
+        let chip=starts.map(e=>{ const c=check(e); return `<span class="chchip ${c.miss.length?'bad':c.col.length?'col':'ok'} src-${e.src}" title="${c.miss.length?'重拍音 '+c.miss.map(noteName).join('、')+' 唔喺呢個和弦入面':c.col.length?'重拍音 '+c.col.map(noteName).join('、')+' 係色彩音（9／maj7／6／11），故意留住嘅張力':'重拍音全部係和弦音'}">${esc(cName(e))}<small>${esc(Harm.roman(keyAt(e.q0),e.root,e.suf))}</small></span>`; }).join('');
         if(!chip){ const cur=evs.find(e=>e.q0<q-1e-6 && e.q1>q+1e-6); chip=cur?'<span class="chcont">–</span>':'<span class="chcont">＋</span>'; }
         const mel=(held&&!ns.length?`<i>(${noteName(held.pitch)})</i>`:'')+ns.map((n,i)=>`<span class="${i===0&&Math.abs(n.qs-q)<1e-6&&strong?'stg':''}">${noteName(n.pitch)}</span>`).join(' ');
         h+=`<button class="chbeat ${strong?'strong':''} ${sel?'sel':''}" data-q="${q}">${chip}<div class="chmel">${mel||'<i>休止</i>'}</div></button>`; }
       h+='</div></div>'; }
     $('chGrid').innerHTML=h; $('chGrid').style.gridTemplateColumns=`repeat(auto-fill,minmax(${Math.max(170, I.beats*78+24)}px,1fr))`;
     $('chGrid').querySelectorAll('.chbeat').forEach(b=>b.onclick=()=>openPick(+b.dataset.q));
-    const bad=evs.filter(e=>check(e).miss.length).length;
-    $('chStat').textContent=evs.length?`${evs.length} 粒和弦${bad?`，⚠ ${bad} 粒唔夾重拍音（紅色）`:'，全部夾重拍音 ✓'}`:'未有和弦';
+    const cks=evs.map(check), bad=cks.filter(c=>c.miss.length).length, col=cks.filter(c=>!c.miss.length&&c.col.length).length;
+    $('chStat').textContent=evs.length?`${evs.length} 粒和弦${bad?`，⚠ ${bad} 粒唔夾重拍音（紅色）`:'，全部夾重拍音 ✓'}${col?`，${col} 粒用重拍色彩音（橙色）`:''}`:'未有和弦';
   }
 
   /* ---- 揀和弦（某一拍）---- */
   function setAt(q, c, src){ CH.pts=CH.pts.filter(p=>Math.abs(p.q-q)>1e-6); if(c) CH.pts.push({q, root:c.root, suf:c.suf, bass:c.bass??c.root, src}); }
   async function openPick(q){
-    CH.sel=q; render(); prep();
+    CH.sel=q; render(); prep(q);
     const evs0=events(); let e=evs0.find(x=>Math.abs(x.q0-q)<1e-6);
     // 呢一格嘅時間段：已經有和弦就用佢；冇就由呢拍開始、最多一格（唔會拖到好遠）
     const key0=CH.key;
@@ -5249,6 +5377,8 @@ const ChordUI=(()=>{
     let h=`<div style="display:flex;justify-content:space-between;gap:8px"><div><h4>第 ${bar+1} 小節・第 ${beat} 拍${I.strongQ.some(sq=>Math.abs(sq-(q-bar*I.B))<1e-6)?'（重拍）':''}</h4>
       <div class="why">旋律：${melTxt||'（休止）'}${mustTxt.length?`　<span class="muted">重拍音：<b>${mustTxt.join('、')}</b>（一定要喺和弦入面）</span>`:''}</div></div><button class="btn" id="chPopX">✕</button></div>`;
     if(e) h+=`<div class="tools">而家：<b>${esc(cName(e))}</b>　<button class="btn" id="chDel">🗑 刪除（沿用上一粒）</button></div>`;
+    if(e){ const tones=Harm.coreOf(e.root,e.suf), IVN={0:'原位',3:'第一轉位（三度喺低音）',4:'第一轉位（三度喺低音）',2:'二度喺低音',5:'四度喺低音',6:'第二轉位（五度喺低音）',7:'第二轉位（五度喺低音）',8:'第二轉位（五度喺低音）',9:'六度喺低音',10:'第三轉位（七度喺低音）',11:'第三轉位（七度喺低音）'};
+      h+=`<div class="chsec">轉位（同一粒和弦，換低音；低音行級進會順好多）</div><div class="chopts">`+tones.map(pc=>btn({root:e.root,suf:e.suf,bass:pc}, IVN[mod(pc-e.root,12)]||'轉位')).join('')+`</div>`; }
     h+=`<div class="chsec">調內和弦（${esc(key.name.replace(/m$/,' 小調').replace(/^([A-G][#b]?)$/,'$1 大調'))}）</div><div class="chopts">`+DIA.map(([r,suf])=>btn({root:mod(key.tonic+r,12),suf},Harm.roman(key,mod(key.tonic+r,12),suf))).join('')+`</div>`;
     h+=`<div class="chsec">🤖 AI 估（${esc(GENRE_ZH[$('chGenre').value]||$('chGenre').value)}・${$('chDecade').value} 年代，按你前面嘅和弦）</div><div class="chopts" id="chAIopts">${ChordAI.ready?'<span class="muted">估緊…</span>':'<button class="btn" id="chAILoad">載入 AI（約 5 MB）</button>'}</div>`;
     const alts=Harm.alternatives(CH.ctx, evsT, idx, 12);
@@ -5281,16 +5411,28 @@ const ChordUI=(()=>{
   const aiStyle=()=>({genre:$('chGenre').value, decade:+$('chDecade').value});
 
   /* ---- 自動配（樂理）：你自己揀過嘅和弦唔郁 ---- */
+  // 一次過配幾個版本（標準 / 柔和 / 大膽 / 另一個選擇 / 經典進行），你揀一個再逐格改
   function auto(){
     prep(); const user=events().filter(e=>e.src==='user').map(e=>({q0:e.q0,q1:Math.min(e.q1,e.q0+slotQ()),bar:e.bar,st:e.st}));
-    const res=Harm.harmonize(I.notes,{key:CH.key, B:I.B, preset:$('chPreset').value, slotQ:slotQ(), strict:$('chStrict').checked, strongQ:I.strongQ, compound:I.compound, seed:CH.seed||11, locks:user, versions:[{id:'std',zh:'',d:{}}]});
-    const keepUser=new Map(CH.pts.filter(p=>p.src==='user').map(p=>[p.q.toFixed(3),p]));
+    const sg=segs();
+    const res=Harm.harmonizeKeys(I.notes,{key:CH.key, B:I.B, preset:$('chPreset').value, slotQ:slotQ(), strict:$('chStrict').checked, strongQ:I.strongQ, compound:I.compound, seed:CH.seed||11, locks:user}, sg);
+    CH.keepUser=new Map(CH.pts.filter(p=>p.src==='user').map(p=>[p.q.toFixed(3),p]));
+    CH.vers=res.versions; CH.verSel=Math.min(CH.verSel||0, res.versions.length-1); useVer(CH.verSel);
+    const P=Harm.PRESETS[$('chPreset').value]||{}, strictTxt=$('chStrict').checked?'重拍音一定係和弦音（9、maj7、6 呢啲色彩音除外，要用「周杰倫 / R&B / 爵士」先會用）':'重拍音可以係色彩音';
+    $('chMsg').textContent=`已經按樂理配好 ${res.versions.length} 個版本（${P.name||''}）：${strictTxt}${sg.length>1?`；中途轉調分 ${sg.length} 段，每段用返自己個調（${sg.map(g=>g.key.name).join(' → ')}）`:''}。上面揀版本，撳任何一格可以改（包括轉位）。`;
+  }
+  function useVer(vi){ const V=CH.vers&&CH.vers[vi]; if(!V) return; CH.verSel=vi; const keepUser=new Map([...(CH.keepUser||new Map()), ...CH.pts.filter(p=>p.src==='user').map(p=>[p.q.toFixed(3),p])]);
     CH.pts=[]; let last=null;
-    for(const e of res.versions[0].events){ const u=keepUser.get(e.q0.toFixed(3)); const c=u||{q:e.q0, root:e.root, suf:e.suf, bass:e.bass, src:'auto'};
+    for(const e of V.events){ const u=keepUser.get(e.q0.toFixed(3)); const c=u||{q:e.q0, root:e.root, suf:e.suf, bass:e.bass, src:'auto'};
       if(last && last.root===c.root && last.suf===c.suf && last.bass===c.bass && !u) continue; CH.pts.push({...c, q:e.q0}); last=c; }
     for(const u of keepUser.values()) if(!CH.pts.some(p=>Math.abs(p.q-u.q)<1e-6)) CH.pts.push(u);
-    $('chMsg').textContent='已經按樂理配好：重拍音一定係和弦音、樂句尾用 ii–V–I / IV–V–I 終止式。撳任何一格可以改。'; render();
-  }
+    renderVers(); render(); }
+  function renderVers(){ const box=$('chVers'); if(!CH.vers||!CH.vers.length){ box.hidden=true; return; } box.hidden=false;
+    const tpl=V=>{ const m=new Map(); for(const t of V.templates||[]){ const b0=Math.floor(t.q0/I.B+1e-9)+1, b1=Math.ceil(t.q1/I.B-1e-9); if(!m.has(t.zh)) m.set(t.zh,[]); m.get(t.zh).push(b0===b1?`${b0}`:`${b0}–${b1}`); }
+      return [...m].map(([zh,bs])=>`${zh}（第 ${bs.join('、')} 小節）`).join('；'); };
+    box.innerHTML='<b>版本：</b>'+CH.vers.map((V,i)=>`<button class="btn ${i===CH.verSel?'primary':''}" data-v="${i}">${esc(V.zh)}</button>`).join('')
+      +(()=>{ const t=tpl(CH.vers[CH.verSel]); return t?`<div class="muted" style="margin-top:4px">用咗嘅經典進行：${esc(t)}</div>`:''; })();
+    box.querySelectorAll('button[data-v]').forEach(b=>b.onclick=()=>{ Preview.stop(); useVer(+b.dataset.v); }); }
   /* ---- AI 配：ChordSeqAI 按風格估每一粒，只揀夾重拍音嘅（beam search）---- */
   async function aiFill(){
     $('chMsg').textContent='載入 AI…';
@@ -5337,7 +5479,7 @@ const ChordUI=(()=>{
     if(!CH.pts.length){ $('chMsg').textContent='未有和弦：先撳「按樂理自動配」、「AI 配」或者逐格揀。'; return; }
     Preview.stop(); const evs=events(), key=CH.key, B=I.B, sp=spellOf(key);
     if(!CH.backup) CH.backup={tracks:S.tracks.map(t=>({...t, notes:t.notes.map(n=>({...n}))})), chords:S.chordOverride, chordB:S.chordB};
-    const per=[]; for(const e of evs){ const bar=Math.floor(e.q0/B+1e-9); const rs=sp.root(e.root,key.fifths), bs=e.bass!==e.root?sp.rel(rs,e.bass-e.root,e.bass):null;
+    const per=[]; for(const e of evs){ const bar=Math.floor(e.q0/B+1e-9), k2=keyAt(e.q0), sp2=spellOf(k2); const rs=sp2.root(e.root,k2.fifths,e.suf), bs=e.bass!==e.root?sp2.rel(rs,e.bass-e.root,e.bass):null;
       (per[bar]=per[bar]||[]).push({step:Math.round((e.q0-bar*B)*4), root:e.root, suf:e.suf, kind:Arranger.KIND[e.suf]||'major', pcs:Arranger.chordPcs(e.root,e.suf), bass:bs?e.bass:null, rs, bs, name:cName(e)}); }
     const pat=$('chPat').value, place=$('chPlace').value;
     if(S.scratch){ // 自己寫嘅譜：直接寫入（Ctrl+Z / 編輯譜「復原」可以還原）
@@ -5376,7 +5518,7 @@ const ChordUI=(()=>{
       $('chPat').innerHTML=Object.entries(Harm.PATTERNS).map(([id,p])=>`<option value="${id}">${p.zh}</option>`).join('');
     }
     const sig=I.notes.length+'|'+I.B+'|'+(I.notes[0]&&I.notes[0].pitch)+'|'+S.title;
-    if(CH.sig!==sig){ CH.sig=sig; CH.pts=[]; CH.sel=null; CH.backup=null;
+    if(CH.sig!==sig){ CH.sig=sig; CH.pts=[]; CH.sel=null; CH.backup=null; CH.vers=null; CH.keepUser=null; CH.verSel=0; renderVers();
       // 用返譜上面已經有嘅和弦（例如之前配過）
       $('chKey').value=I.key.tonic+':'+I.key.mode; $('chRate').value=I.B===4&&!I.compound?'half':'bar'; $('chPreset').value='triad'; $('chStrict').checked=true; $('chPat').value='none';
       const hasLH=(S.tracks||[]).some(t=>(t.role==='piano'||t.role==='both') && t.notes.some(n=>n.hand==='l'));
@@ -5391,7 +5533,7 @@ const ChordUI=(()=>{
   $('chClose').onclick=()=>{ Preview.stop(); $('chDlg').hidden=true; $('chPop').hidden=true; };
   $('chAuto').onclick=()=>{ CH.seed=11; auto(); };
   $('chAIGo').onclick=aiFill;
-  $('chClear').onclick=()=>{ CH.pts=[]; $('chPop').hidden=true; render(); };
+  $('chClear').onclick=()=>{ CH.pts=[]; CH.vers=null; CH.keepUser=null; $('chPop').hidden=true; renderVers(); render(); };
   for(const id of ['chKey','chPreset','chStrict']) $(id).onchange=()=>{ prep(); render(); };
   $('chRate').onchange=()=>{ prep(); render(); };
   $('chPlay').onclick=()=>playSpan(0, endQ());
