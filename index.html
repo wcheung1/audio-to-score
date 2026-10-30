@@ -156,6 +156,11 @@ body.edadd #paper svg{cursor:crosshair}
 body.edbox #paper{touch-action:none;cursor:cell}
 #editBar .mini.on{background:#1c7ed6;color:#fff;border-color:#1c7ed6}
 #edNotes{font-size:12.5px;margin-left:8px}.ednote{display:inline-flex;gap:2px;border:1px solid #c5ccd4;border-radius:6px;padding:0 4px;margin:0 2px}.ednote.on{border-color:#f08c00;background:#fff4e6}.ednote a{text-decoration:none;color:inherit}.ednote a[data-x]{color:#c92a2a}
+.chkb{position:sticky;top:-26px;z-index:6;background:#fff;border:1px solid #e3e6ea;border-radius:10px;padding:6px 8px;margin:6px 0 8px;box-shadow:0 4px 10px rgba(0,0,0,.06)}
+.chkb.min .chkbkeys,.chkb.min #chKbEdit{display:none}
+.chkbtop{display:flex;gap:10px;align-items:center;font-size:13px;margin-bottom:4px}.chkbtop b{font-size:16px;min-width:60px}
+.chkbkeys{height:112px}
+#chKbEdit .row{font-size:13px;margin-top:4px}#chKbId b{font-size:15px}
 .chlib{align-items:center}#chLibBox{flex-basis:100%;font-size:13px;border:1px solid #e3e6ea;border-radius:8px;padding:8px 10px}
 #chLibBox .lrow{display:flex;gap:8px;align-items:center;margin:3px 0}
 .chsegbox{border:1px solid #e3e6ea;border-radius:8px;padding:8px 10px;margin:6px 0;font-size:13px}
@@ -795,6 +800,13 @@ body.roll-keys .roll .legend, body.roll-keys .roll .roll-hint{display:none}
     </div>
     <div class="muted" id="chMsg" style="min-height:18px"></div>
     <div class="chvers" id="chVers" hidden></div>
+    <div class="chkb" id="chKb">
+      <div class="chkbtop"><b id="chKbName">🎹</b><span id="chKbInfo" class="muted">試聽時琴鍵會跟住和弦著燈（橙 = 和弦 / 伴奏，藍 = 旋律）。撳網格一格，就可以喺琴鍵加 / 減音自己砌和弦。</span><span style="flex:1"></span><button class="btn" id="chKbHide">收埋琴鍵</button></div>
+      <div id="chKbKeys" class="chkbkeys"></div>
+      <div id="chKbEdit" hidden>
+        <div class="row"><span id="chKbId"></span><span style="flex:1"></span><button class="btn" id="chKbPlay">▶ 聽</button><button class="btn" id="chKbClr">清晒</button><button class="btn primary" id="chKbUse">✓ 用呢個按法</button></div>
+        <div class="chsec" id="chKbCandT">夾你揀嘅音、又夾呢格旋律嘅和弦（越前越推介）</div><div class="chopts" id="chKbCands"></div></div>
+    </div>
     <div class="chgrid" id="chGrid"></div>
     <div class="chlegend"><span><i class="ok"></i>綠 = 重拍音全部係和弦音</span><span><i class="col"></i>橙 = 重拍音係色彩音（9／maj7／6，周杰倫式張力）</span><span><i class="bad"></i>紅 = 有重拍音唔喺和弦入面（會撞）</span><span>藍字 = 你自己揀；紫字 = AI 揀；黑字 = 樂理自動配</span><span id="chStat"></span></div>
     <h3>伴奏</h3>
@@ -809,7 +821,6 @@ body.roll-keys .roll .legend, body.roll-keys .roll .roll-hint{display:none}
       <div class="row"><button class="btn" id="chSegAdd">＋ 加一段</button><button class="btn" id="chSegAuto" title="按旋律高低同密度：每 4 小節一段，旋律最高嗰幾段（通常係副歌）用激昂伴奏，其他用抒情伴奏，最尾一小節長音">🪄 自動分段（主歌抒情、副歌激昂）</button><button class="btn" id="chSegClr">清除分段</button></div></div>
     <div class="arrset">
       <button class="btn" id="chPlay">▶ 試聽（旋律＋和弦）</button><label>由第 <input type="number" id="chFrom" min="1" value="1" style="width:58px"> 小節開始</label><button class="btn" id="chStop">■ 停</button>
-      <label title="試聽同寫入嘅和弦由低至高逐粒彈（似譜上和弦旁邊嗰條波浪線），聽落柔和啲"><input type="checkbox" id="chRoll"> 🌊 琶音和弦（rolled）</label>
       <span class="muted">（撳網格左邊嘅小節號碼都可以由嗰度播）</span>
     </div>
     <div class="arrset">
@@ -3130,6 +3141,8 @@ const Harm = (() => {
      最多 3–4 粒音；3 度唔放喺 C3 以下（低音區音程限制）；換和弦時揀最近嘅轉位（聲部進行）。 */
   const PATTERNS={
     none:{zh:'唔加伴奏（淨係寫和弦名）'},
+    rolled:{zh:'🌊 琶音和弦 rolled（每粒和弦由低至高掃一下）'},
+    rolledBeat:{zh:'🌊 琶音和弦 rolled（每拍掃一下）'},
     oompah:{zh:'嘭–恰（低音＋後拍和弦，兒歌 / 進行曲）'},
     alberti:{zh:'分解 do–so–mi–so（1-5-3-5，阿爾貝蒂低音）'},
     b1585:{zh:'分解 do–so–do–so（1-5-8-5）'},
@@ -3233,6 +3246,9 @@ const Harm = (() => {
         for(let q=e.q0;q<e.q1-1e-6;q+=beat){ const d=Math.min(beat,e.q1-q), first=q===e.q0||Math.abs(at(q))<1e-6, mid=B===4&&Math.abs(at(q)-2)<1e-6;
           if(first) N(bass,q,q+d*0.9,74); else if(mid) N(p5-12>=36?p5-12:p5,q,q+d*0.9,66); else up.forEach(p=>N(p,q,q+d*0.6,54)); } }
       else if(pat==='hold'){ N(bass,e.q0,e.q1,72); up.forEach(p=>N(p,e.q0+0.02,e.q1,52)); }
+      else if(pat==='rolled'||pat==='rolledBeat'){ // 琶音和弦：成粒和弦（低音 + 上面）一齊寫，加琶音記號，播嗰陣由低至高掃
+        const step=pat==='rolled'?(e.q1-e.q0):beat; for(let q=e.q0;q<e.q1-1e-6;q+=step){ const d=Math.min(step,e.q1-q); const k0=out.length;
+          N(bass,q,q+d,q===e.q0?72:64); up.forEach(p=>N(p,q,q+d,q===e.q0?54:48)); for(let k=k0;k<out.length;k++) out[k].orn='arpeggio'; } }
       else if(pat==='block'){ N(bass,e.q0,e.q1,72); for(let q=e.q0;q<e.q1-1e-6;q+=beat){ const d=Math.min(beat,e.q1-q); up.forEach(p=>N(p,q,q+d*0.85,q===e.q0?56:50)); } }
       else if(['jay8','q1585','octHalf','octBounce','syncOct','arp16','pop8','s332','bossa'].includes(pat)){
         const HB=B%2===0&&B>=4?B/2:B;                                  // 半小節（4/4 = 2 拍）；3/4 就成小節
@@ -5695,7 +5711,7 @@ const ChordUI=(()=>{
   /* ---- 揀和弦（某一拍）---- */
   function setAt(q, c, src){ CH.pts=CH.pts.filter(p=>Math.abs(p.q-q)>1e-6); if(c) CH.pts.push({q, root:c.root, suf:c.suf, bass:c.bass??c.root, src}); }
   async function openPick(q){
-    CH.sel=q; render(); prep(q);
+    CH.sel=q; render(); prep(q); kbOpen(q);
     const evs0=events(); let e=evs0.find(x=>Math.abs(x.q0-q)<1e-6);
     // 呢一格嘅時間段：已經有和弦就用佢；冇就由呢拍開始、最多一格（唔會拖到好遠）
     const key0=CH.key;
@@ -5745,7 +5761,7 @@ const ChordUI=(()=>{
         +`</optgroup><optgroup label="其他低音（例如 A/G、F/G）">`+other.map(pc=>`<option value="${pc}">低音 ${nm(sp.rel(sp.root(r,key.fifths),pc-r,pc))}</option>`).join('')+`</optgroup>`; };
     if(e){ $('chR').value=e.root; $('chQ').value=e.suf; } fillBass(); if(e) $('chBs').value=e.bass;
     $('chR').onchange=fillBass; $('chQ').onchange=fillBass;
-    $('chPopX').onclick=()=>{ pop.hidden=true; CH.sel=null; render(); };
+    $('chPopX').onclick=()=>{ pop.hidden=true; CH.sel=null; kbClose(); render(); };
     if(e) $('chDel').onclick=()=>{ setAt(q,null); pop.hidden=true; CH.sel=null; render(); };
     const choose=(c)=>{ setAt(q,c,'user'); CH.autoNext=$('chNext').checked; render(); playSpan(Math.max(0,q-I.B), q+I.B);
       if(CH.autoNext){ const nq=q+slotQ(); if(nq<endQ()-1e-6) openPick(nq); else { pop.hidden=true; CH.sel=null; render(); } } else openPick(q); };
@@ -5824,6 +5840,63 @@ const ChordUI=(()=>{
       const c={q:e.q0, root:e.root, suf:e.suf, bass:e.bass, src:u?'user':'ai'}; CH.pts.push(c); last=c; }
     $('chMsg').textContent=`AI（${GENRE_ZH[sty.genre]||sty.genre}・${sty.decade} 年代）配好；佢只會喺「夾重拍音」嘅和弦入面揀。撳任何一格可以改。`; render();
   }
+
+  /* ---- 🎹 和弦琴鍵：試聽時著燈；撳一格之後可以喺琴鍵自己砌和弦，即時認和弦 + 推介 ---- */
+  let kb=null;
+  function kbInit(){ if(kb) return; kb=new PianoRow($('chKbKeys'),{start:36, whiteW:22, labels:true, onDown:m=>kbTap(m), onUp:()=>{}}); kb.centerOn(55); }
+  function kbMarks(acc, mel){ kbInit(); const M=new Map(); for(const p of mel) M.set(p,'#74c0fc'); for(const p of acc) M.set(p,'#f59f00'); kb.marks=M; kb.draw(); }
+  function kbPlay(ps){ ensureSampler().then(()=>{ const t=Tone.now(); ps.slice().sort((a,b)=>a-b).forEach((p,i)=>{ try{ sampler.triggerAttackRelease(Tone.Frequency(p,'midi').toNote(),1.6,t+i*0.04,0.6); }catch(e){} }); }); }
+  // 試聽緊：而家呢一刻響緊嘅伴奏 + 旋律
+  function kbFollow(q){ if(CH.kbEdit || !CH.playNs || $('chKb').classList.contains('min')) return; const ns=CH.playNs.filter(n=>n.qs<=q+1e-6 && n.qe>q+1e-6);
+    kbMarks(ns.filter(n=>n.hand==='l').map(n=>n.pitch), ns.filter(n=>n.hand!=='l').map(n=>n.pitch)); const e=events().find(x=>x.q0<=q+1e-6 && x.q1>q+1e-6); $('chKbName').textContent=e?cName(e):'—'; }
+  // 撳一格：而家嗰粒和弦嘅按法（之前自己砌過就用返）
+  function kbOpen(q){ kbInit(); const evs=events(), e=evs.find(x=>Math.abs(x.q0-q)<1e-6)||evs.find(x=>x.q0<=q+1e-6 && x.q1>q+1e-6); let ps=[];
+    const pt=CH.pts.find(p=>Math.abs(p.q-q)<1e-6);
+    if(pt && pt.vx) ps=pt.vx.slice(); else if(e){ ps=Harm.accomp([{...e}], I.notes, {B:I.B, beatQ:I.beatQ, pattern:'hold', key:CH.key, declash:false}).filter(n=>n.qs<e.q0+0.1).map(n=>n.pitch); }
+    CH.kbEdit={q, set:new Set(ps)}; $('chKbEdit').hidden=false; $('chKb').classList.remove('min'); $('chKbHide').textContent='收埋琴鍵'; if(ps.length) kb.centerOn(Math.min(...ps)+10); kbRefresh(); }
+  function kbClose(){ CH.kbEdit=null; $('chKbEdit').hidden=true; $('chKbName').textContent='🎹'; if(kb){ kb.marks=new Map(); kb.draw(); } }
+  function kbTap(m){ if(!CH.kbEdit){ kbPlay([m]); return; } const S1=CH.kbEdit.set; if(S1.has(m)) S1.delete(m); else { S1.add(m); kbPlay([m]); } kbRefresh(); }
+  const allSufs=()=>[...new Set(QUAL.map(x=>x[0]).concat(Object.keys(Arranger.Q)))];
+  // 準確認和弦：你按嘅音 = 某粒和弦嘅全部音（低音 = 最低嗰粒）
+  function identify(ps){ const pcs=[...new Set(ps.map(p=>mod(p,12)))]; if(pcs.length<3) return []; const bassPc=mod(Math.min(...ps),12), out=[];
+    for(let r=0;r<12;r++) for(const suf of allSufs()){ const cp=[...new Set(Arranger.chordPcs(r,suf))]; if(cp.length!==pcs.length || !pcs.every(x=>cp.includes(x))) continue;
+      out.push({root:r, suf, bass:bassPc, sc:(r===bassPc?2:0)-(Harm.CPX[suf]??1)-(QUAL.some(x=>x[0]===suf)?0:0.5)}); }
+    return out.sort((a,b)=>b.sc-a.sc); }
+  function fitsMel(root,suf,bass,must){ const P=CH.ctx&&CH.ctx.P, core=Harm.coreOf(root,suf), st={root,suf,bass}; return must.every(pc=>core.includes(pc) || (!!(P&&P.color) && isFinite(Harm.colorCost(pc,st,P._scale)))); }
+  // 推介：包含你揀嘅音、夾呢格旋律（重拍音）、同前後和弦接得順；撞音嘅唔推介
+  function kbCands(ps, q){ const pcs=[...new Set(ps.map(p=>mod(p,12)))], bassPc=ps.length?mod(Math.min(...ps),12):null;
+    prep(q); const ctx=CH.ctx, evs0=events(), e=evs0.find(x=>x.q0<=q+1e-6 && x.q1>q+1e-6); const q1=e?Math.min(e.q1, q+Math.max(slotQ(), e.q1-e.q0)):q+slotQ();
+    const span={q0:q, q1, bar:Math.floor(q/I.B+1e-9), ns:Harm.notesIn(ctx.mel,q,q1,I.B)}; const must=Harm.mustFor(ctx,span).must; span.must=must; span.soft=[];
+    const prev=evs0.filter(x=>x.q0<q-1e-6).pop(), next=evs0.find(x=>x.q0>=q1-1e-6), melPcs=I.notes.filter(n=>n.qs<q1-1e-6 && n.qe>q+1e-6 && n.qe-n.qs>=0.75).map(n=>mod(n.pitch,12));
+    const res=[], seen=new Set(), allow=ctx.allow, sufs=allSufs();
+    // 跟「和弦用法」：三和弦模式就淨係推介三和弦 / 7；搵唔到先放寬
+    for(const pass of allow?[1,2]:[2]){ if(res.length) break;
+    for(let r=0;r<12;r++) for(const suf of sufs){ if(pass===1 && !allow.has(suf)) continue; const cp=[...new Set(Arranger.chordPcs(r,suf))]; if(pcs.length && !pcs.every(x=>cp.includes(x))) continue;
+      const bass=bassPc!=null && cp.includes(bassPc)?bassPc:r; const k=r+'|'+suf+'|'+bass; if(seen.has(k)) continue; seen.add(k);
+      if(!fitsMel(r,suf,bass,must)) continue;
+      // 旋律長音同和弦音相差半音（而本身唔係和弦音）= 撞
+      if(melPcs.some(m=>!cp.includes(m) && cp.some(c=>{ const d=mod(m-c,12); return d===1||d===11; }) && !(CH.ctx.P.color && isFinite(Harm.colorCost(m,{root:r,suf,bass},CH.ctx.P._scale))))) continue;
+      const st=Harm.stateFor(ctx,r,suf,bass); let sc=Harm.unary(span,st,ctx); if(prev&&prev.st) sc+=Harm.trans(prev.st,st,ctx,prev.bar===span.bar); if(next&&next.st) sc+=Harm.trans(st,next.st,ctx,false);
+      sc-=0.3*Math.max(0,cp.length-Math.max(3,pcs.length)); if(sc<-8) continue; res.push({root:r, suf, bass, sc}); } }
+    return res.sort((a,b)=>b.sc-a.sc).slice(0,12); }
+  function kbRefresh(){ const E=CH.kbEdit; if(!E) return; const q=E.q, ps=[...E.set].sort((a,b)=>a-b);
+    const evs=events(), e=evs.find(x=>x.q0<=q+1e-6 && x.q1>q+1e-6), q1=e?e.q1:q+slotQ(); const mel=I.notes.filter(n=>n.qs<q1-1e-6 && n.qe>q+1e-6).map(n=>n.pitch);
+    kbMarks(ps, mel); prep(q); const f=CH.key.fifths; const nn=p=>Core.noteLabel(p,f);
+    const ex=identify(ps), pcs=[...new Set(ps.map(p=>mod(p,12)))];
+    const semi=[]; for(const a of pcs) for(const b of pcs) if(mod(b-a,12)===1) semi.push([a,b]);
+    let txt;
+    if(!ps.length) txt='未有音：撳琴鍵揀 1–3 粒音，下面會推介和弦';
+    else if(ex.length){ const c=ex[0], must=Harm.mustFor(CH.ctx,{q0:q,q1,bar:Math.floor(q/I.B+1e-9)}).must, ok=fitsMel(c.root,c.suf,c.bass,must);
+      txt=`你按嘅係 <b>${esc(cName(c,CH.key))}</b>（${esc(Harm.roman(CH.key,c.root,c.suf))}）${ok?'　✓ 夾呢格旋律':'　⚠ 同呢格重拍旋律音撞'}${ex.length>1?`<span class="muted">　亦可以叫 ${ex.slice(1,3).map(x=>esc(cName(x,CH.key))).join('、')}</span>`:''}`; }
+    else if(pcs.length>=3 && semi.length) txt=`⚠ 撞音：${semi.slice(0,2).map(([a,b])=>nn(60+a).replace(/\d+$/,'')+' 同 '+nn(60+b).replace(/\d+$/,'')).join('、')} 相差半音，唔係常見和弦`;
+    else txt=`揀咗 ${ps.map(nn).join(' ')}${pcs.length<3?'：仲未夠成粒和弦，下面係包含呢幾粒音嘅推介':'：唔係標準和弦，下面係最近嘅推介'}`;
+    $('chKbId').innerHTML=txt; $('chKbName').textContent=ex.length?cName(ex[0],CH.key):(ps.length?'？':'🎹');
+    $('chKbUse').disabled=!ex.length; $('chKbUse').title=ex.length?`用 ${cName(ex[0],CH.key)}，而且伴奏（柱式 / 長音 / 琶音和弦）照你按嘅音彈`:'要先按成一粒和弦（3 粒音或以上）';
+    const cs=kbCands(ps, q); $('chKbCandT').textContent=ps.length?'包含你揀嘅音、又夾呢格旋律嘅和弦（越前越推介；撞音嘅唔會出）':'夾呢格旋律嘅和弦（越前越推介）';
+    $('chKbCands').innerHTML=cs.length?cs.map((c,i)=>`<button class="chopt ok" data-k="${c.root}|${c.suf}|${c.bass}"><b>${i<3?'★ ':''}${esc(cName(c,CH.key))}</b><small>${esc(Harm.roman(CH.key,c.root,c.suf))}</small></button>`).join(''):'<span class="muted">冇和弦可以包含晒呢幾粒音又唔撞旋律：試吓刪走一兩粒</span>';
+    $('chKbCands').querySelectorAll('[data-k]').forEach(b=>{ const [r,sf,bs]=b.dataset.k.split('|'); b.onclick=()=>kbApply({root:+r, suf:sf, bass:+bs}, null); b.onmouseenter=()=>{}; }); }
+  function kbApply(c, vx){ const q=CH.kbEdit?CH.kbEdit.q:CH.sel; if(q==null) return; setAt(q,c,'user'); const pt=CH.pts.find(p=>Math.abs(p.q-q)<1e-6); if(pt && vx) pt.vx=vx.slice().sort((a,b)=>a-b);
+    render(); playSpan(Math.max(0,q-I.B), q+I.B); openPick(q); }
 
   /* ---- 📚 歌庫：學原版譜嘅和弦同左手型（存喺呢部機嘅瀏覽器；可以匯出備份）---- */
   const LIBK='os.styleLib';
@@ -5938,7 +6011,14 @@ const ChordUI=(()=>{
     for(const pat of pats){ if(!pat || pat==='none') continue; const ns=Harm.accomp(evs, I.notes, {B:I.B, beatQ:I.beatQ, pattern:pat, key:CH.key, profile:libProfile()});
       for(const n of ns){ const bar=Math.floor(n.qs/I.B+1e-9); if(patAt(bar,gp)!==pat) continue; let qe=n.qe;
         for(let b=bar+1; b*I.B<qe-1e-6; b++) if(patAt(b,gp)!==pat){ qe=b*I.B; break; } out.push({...n, qe}); } }
-    return voiceAcc(out, evs); }
+    return applyVx(voiceAcc(out, evs), evs, gp); }
+  // 喺琴鍵自己砌嘅按法（pt.vx）：柱式 / 長音 / 琶音和弦就用返你按嘅音
+  function applyVx(ns, evs, gp){ let out=ns;
+    for(const e of evs){ const pt=CH.pts.find(p=>Math.abs(p.q-e.q0)<1e-6); if(!pt || !pt.vx || !pt.vx.length) continue; const pat=patAt(Math.floor(e.q0/I.B+1e-9), gp);
+      if(!['hold','rolled','rolledBeat','block'].includes(pat)) continue;
+      out=out.filter(n=>!(n.qs>=e.q0-1e-6 && n.qs<e.q1-1e-6)); const step=(pat==='rolledBeat'||pat==='block')?I.beatQ:(e.q1-e.q0);
+      for(let q=e.q0;q<e.q1-1e-6;q+=step){ const d=Math.min(step,e.q1-q); pt.vx.forEach((p,i)=>out.push({pitch:p, qs:q, qe:q+d*(pat==='block'?0.9:1), vel:i===0?70:54, hand:'l', orn:pat.startsWith('rolled')?'arpeggio':undefined, vx:true})); } }
+    return out.sort((a,b)=>a.qs-b.qs||a.pitch-b.pitch); }
   // 音高：全首（和弦音高 / 低音）＋ 每粒和弦自己嘅設定（pt.vo）
   function voiceAcc(ns, evs){ const upSh=+($('chUpSh').value||0), bSh=+($('chBassSh').value||0);
     for(const e of evs){ const pt=CH.pts.find(p=>Math.abs(p.q-e.q0)<1e-6), vo=(pt&&pt.vo)||{};
@@ -5962,12 +6042,12 @@ const ChordUI=(()=>{
       if(last && last.b===a-1) last.b=b; else CH.segs.push({a,b,pat:hot}); }
     if(nb>1){ const t=CH.segs[CH.segs.length-1]; if(t && t.b===nb){ if(t.a<nb) t.b=nb-1; else CH.segs.pop(); } CH.segs.push({a:nb,b:nb,pat:'hold'}); }
     segRender(); $('chMsg').textContent=`全首用「${Harm.PATTERNS[lyr].zh}」；旋律最高嗰 ${CH.segs.length-1} 段（多數係副歌）用「${Harm.PATTERNS[hot].zh}」；最尾一小節長音。可以逐段改。`; }
-  function hl(q){ document.querySelectorAll('.chbar.play').forEach(x=>x.classList.remove('play')); if(q<0) return; const b=Math.floor(q/I.B); const el=$('chGrid').children[b]; if(el) el.classList.add('play'); }
+  function hl(q){ document.querySelectorAll('.chbar.play').forEach(x=>x.classList.remove('play')); if(q<0){ if(!CH.kbEdit && kb){ kb.marks=new Map(); kb.draw(); } return; } kbFollow(q); const b=Math.floor(q/I.B); const el=$('chGrid').children[b]; if(el) el.classList.add('play'); }
   function playSpan(a, b){ const pat=$('chPat').value==='none'&&!CH.segs.length?'hold':$('chPat').value;
     const ns=I.notes.filter(n=>n.qe>a && n.qs<b).map(n=>({pitch:n.pitch, qs:Math.max(a,n.qs), qe:Math.min(b,n.qe), vel:90}))
       .concat(accNotes(pat).filter(n=>n.qe>a && n.qs<b).map(n=>({...n, qs:Math.max(a,n.qs), qe:Math.min(b,n.qe)})));
-    if($('chRoll').checked){ const bpm=+$('bpm').value||I.bpm, spq=60/bpm; rollMark(ns.filter(n=>n.hand==='l')).forEach((off,n)=>{ n.qs+=off/spq; }); }
-    if(ns.length) Preview.play(ns, +$('bpm').value||I.bpm, hl); }
+    { const bpm=+$('bpm').value||I.bpm, spq=60/bpm; rollMark(ns.filter(n=>n.orn==='arpeggio')).forEach((off,n)=>{ n.qs+=off/spq; }); }
+    if(ns.length){ CH.playNs=ns; Preview.play(ns, +$('bpm').value||I.bpm, hl); } }
   // 同一刻開始嘅伴奏和弦（2 粒或以上）：由低至高每粒遲 35 毫秒
   function rollMark(ns){ const m=new Map(), g=new Map(); for(const n of ns){ const k=n.qs.toFixed(3); if(!g.has(k)) g.set(k,[]); g.get(k).push(n); }
     for(const v of g.values()) if(v.length>=2) v.sort((a,b)=>a.pitch-b.pitch).forEach((n,i)=>m.set(n,i*0.035)); return m; }
@@ -5978,12 +6058,12 @@ const ChordUI=(()=>{
     if(!CH.backup) CH.backup={tracks:S.tracks.map(t=>({...t, notes:t.notes.map(n=>({...n}))})), chords:S.chordOverride, chordB:S.chordB};
     const per=[]; for(const e of evs){ const bar=Math.floor(e.q0/B+1e-9), k2=keyAt(e.q0), sp2=spellOf(k2); const rs=sp2.root(e.root,k2.fifths,e.suf), bs=e.bass!==e.root?sp2.rel(rs,e.bass-e.root,e.bass):null;
       (per[bar]=per[bar]||[]).push({step:Math.round((e.q0-bar*B)*4), root:e.root, suf:e.suf, kind:Arranger.KIND[e.suf]||'major', pcs:Arranger.chordPcs(e.root,e.suf), bass:bs?e.bass:null, rs, bs, name:cName(e)}); }
-    const pat=cel?'cello':$('chPat').value, place=$('chPlace').value, roll=$('chRoll').checked;
+    const pat=cel?'cello':$('chPat').value, place=$('chPlace').value;
     const segKeep=CH.segs; if(cel) CH.segs=[];
-    const markRoll=list=>{ if(!roll || cel) return list; const g=new Map(); for(const n of list){ const k=(n.qs??n.s/4).toFixed(3); if(!g.has(k)) g.set(k,[]); g.get(k).push(n); } for(const v of g.values()) if(v.length>=3) v.forEach(n=>n.orn='arpeggio'); return list; };
+    const markRoll=list=>{ return list; const g=new Map(); for(const n of list){ const k=(n.qs??n.s/4).toFixed(3); if(!g.has(k)) g.set(k,[]); g.get(k).push(n); } for(const v of g.values()) if(v.length>=3) v.forEach(n=>n.orn='arpeggio'); return list; };
     if(S.scratch){ // 自己寫嘅譜：直接寫入（Ctrl+Z / 編輯譜「復原」可以還原）
       Ed.snap(); const a=S.arr; a.chords=Array.from({length:a.totalBars},(_,b)=>per[b]||[]); let m2='和弦名已經寫上樂譜。';
-      if(pat!=='none'||CH.segs.length){ const acc=markRoll(accNotes(pat).map(n=>({id:Core.nextId(), pitch:n.pitch, s:Math.round(n.qs*4), e:Math.max(Math.round(n.qs*4)+1, Math.round(n.qe*4)), vel:n.vel||70})));
+      if(pat!=='none'||CH.segs.length){ const acc=markRoll(accNotes(pat).map(n=>({id:Core.nextId(), pitch:n.pitch, s:Math.round(n.qs*4), e:Math.max(Math.round(n.qs*4)+1, Math.round(n.qe*4)), vel:n.vel||70, orn:n.orn})));
         if(cel){ const pt=mkPart('cello'); pt.notes=acc; (a.parts=a.parts||[]).push(pt); m2+=' 加咗一行大提琴伴奏。'; }
         else if(place==='lh'){ a.lh=acc; m2+=' 左手寫咗伴奏。'; } else { const pt=mkPart('piano2'); pt.label='伴奏'; pt.short='伴'; pt.clef='bass'; pt.notes=acc; (a.parts=a.parts||[]).push(pt); m2+=' 伴奏加咗做獨立一行。'; } }
       CH.segs=segKeep; Ed.changed(); $('chMsg').textContent=m2; $('chDlg').hidden=true; $('chPop').hidden=true; flashT(m2+'（唔啱可以撳編輯譜「↶ 復原」）'); return; }
@@ -5991,7 +6071,7 @@ const ChordUI=(()=>{
     let msg='和弦名已經寫上樂譜，原本嘅音一粒都冇郁。';
     if(pat!=='none'||CH.segs.length){
       const toSec=q=>S.an.tOf(q);
-      const acc=markRoll(accNotes(pat).map(n=>({pitch:n.pitch, start:toSec(n.qs), end:toSec(n.qe), velocity:n.vel, qs:n.qs, qe:n.qe, hand:'l'})));
+      const acc=markRoll(accNotes(pat).map(n=>({pitch:n.pitch, start:toSec(n.qs), end:toSec(n.qe), velocity:n.vel, qs:n.qs, qe:n.qe, hand:'l', orn:n.orn})));
       if(cel){ tracks.push({name:'Cello', zh:'大提琴', program:42, role:'staff', isAcc:true, notes:acc.map(n=>({...n, hand:undefined}))}); msg='和弦名已經寫上，加咗一行大提琴伴奏（原譜冇郁）。'; }
       else if(place==='lh'){
         const piano=tracks.filter(t=>t.role==='piano'||t.role==='both');
@@ -6021,7 +6101,7 @@ const ChordUI=(()=>{
     const sig=I.notes.length+'|'+I.B+'|'+(I.notes[0]&&I.notes[0].pitch)+'|'+S.title;
     if(CH.sig!==sig){ CH.sig=sig; CH.pts=[]; CH.sel=null; CH.backup=null; CH.vers=null; CH.keepUser=null; CH.verSel=0; CH.segs=[]; $('chFrom').value=1; renderVers();
       // 用返譜上面已經有嘅和弦（例如之前配過）
-      $('chKey').value=I.key.tonic+':'+I.key.mode; $('chRate').value=I.B===4&&!I.compound?'half':'bar'; $('chPreset').value='triad'; $('chStrict').checked=true; $('chPat').value='none';
+      $('chKey').value=I.key.tonic+':'+I.key.mode; $('chRate').value=I.B===4&&!I.compound?'half':'bar'; $('chPreset').value='triad'; $('chStrict').checked=true; $('chPat').value='rolled';
       const hasLH=(S.tracks||[]).some(t=>(t.role==='piano'||t.role==='both') && t.notes.some(n=>n.hand==='l'));
       $('chPlace').value=hasLH?'staff':'lh';
       if(S.chordOverride){ prep(); S.chordOverride.forEach((list,b)=>(list||[]).forEach(c=>{ if(c && !c.carried) CH.pts.push({q:b*I.B+c.step/4, root:c.root, suf:c.suf, bass:c.bass??c.root, src:'user'}); })); }
@@ -6047,10 +6127,14 @@ const ChordUI=(()=>{
   $('chXlsxIn').onchange=async()=>{ const f=$('chXlsxIn').files[0]; $('chXlsxIn').value=''; if(f) try{ await xlsxImport(f); }catch(err){ $('chMsg').textContent='讀唔到呢個檔：'+err.message; } };
   $('chStop').onclick=()=>{ Preview.stop(); hl(-1); };
   $('chApply').onclick=apply; $('chUndo').onclick=undo;
+  $('chKbHide').onclick=()=>{ const m=$('chKb').classList.toggle('min'); $('chKbHide').textContent=m?'顯示琴鍵':'收埋琴鍵'; if(!m && kb) kb.draw(); };
+  $('chKbPlay').onclick=()=>{ if(CH.kbEdit) kbPlay([...CH.kbEdit.set]); };
+  $('chKbClr').onclick=()=>{ if(CH.kbEdit){ CH.kbEdit.set.clear(); kbRefresh(); } };
+  $('chKbUse').onclick=()=>{ if(!CH.kbEdit) return; const ps=[...CH.kbEdit.set]; const ex=identify(ps); if(ex.length) kbApply(ex[0], ps); };
   $('chLearn').onclick=learnNow; $('chLibMgr').onclick=()=>{ const b=$('chLibBox'); b.hidden=!b.hidden; libRender(); }; $('chUseLib').onchange=()=>{ libCache=null; };
   $('chCello').onclick=()=>{ if(!CH.pts.length){ if($('chPreset').value!=='triad') $('chPreset').value='triad'; auto(); } $('chPlace').value='cello'; apply(); };
   $('chAIFile').onchange=async()=>{ const f=$('chAIFile').files[0]; if(!f) return; try{ await ChordAI.load(m=>{ $('chMsg').textContent=m; }, f); $('chAIFileL').hidden=true; $('chMsg').textContent='AI 模型載入咗。'; }catch(e){ $('chMsg').textContent='模型載入唔到：'+e.message; } };
-  return {open, get state(){ return CH; }, auto, aiFill, events:()=>events(), info:()=>I};
+  return {open, get state(){ return CH; }, auto, aiFill, events:()=>events(), info:()=>I, _kb:{tap:m=>kbTap(m), cands:(ps,q)=>kbCands(ps,q), identify}};
 })();
 
 /* ===================== 🎸 和弦分析（似 Chord AI）===================== */
