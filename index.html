@@ -513,7 +513,8 @@ body.roll-keys .roll .legend, body.roll-keys .roll .roll-hint{display:none}
       <div class="grp" title="歌詞"><button class="mini" data-ed="lyric" title="撳一粒音再撳（或者按 L）：打字；空格 / - = 下一粒音，Enter = 完成；中文每打一個字自動跳去下一粒音">🎤 歌詞</button>
         <select id="edLyV" title="第幾段歌詞"><option value="0">第 1 段</option><option value="1">第 2 段</option><option value="2">第 3 段</option><option value="3">第 4 段</option></select>
         <button class="mini" id="edLyPaste" title="一次過貼成段歌詞，由揀咗嗰粒音開始逐粒填">📝 貼歌詞</button></div>
-      <div class="grp" title="複製 / 剪下 / 貼上（Ctrl+C / X / V）：撳第一粒音、Shift+撳最後一粒揀一段；可以貼去另一個小節、另一行、另一個視窗嘅另一首歌"><button class="mini" data-ed="copy">📋 複製</button><button class="mini" data-ed="cut">✂ 剪下</button><button class="mini" data-ed="paste">📌 貼上</button></div>
+      <div class="grp" title="揀一段：Ctrl+A 全選；Shift+→ / Ctrl+→ 逐粒揀多啲（Shift+← 縮返）；Ctrl+Shift+→ 逐個小節；Shift+撳另一行 = 高低音譜一齊揀。複製 / 剪下 / 貼上（Ctrl+C / X / V）：撳要貼嘅位置再貼；可以貼去另一個小節、另一行、另一個視窗嘅另一首歌"><button class="mini" data-ed="all" title="全選（Ctrl+A）：所有譜行、所有音">☑ 全選</button><button class="mini" data-ed="copy">📋 複製</button><button class="mini" data-ed="cut">✂ 剪下</button><button class="mini" data-ed="paste">📌 貼上</button></div>
+      <div class="grp" title="加空小節：後面啲音會順延，唔會洗走">＋ <select id="edBarN" title="加幾多個"><option>1</option><option>2</option><option>3</option><option>4</option><option>8</option><option>16</option></select> 小節 <button class="mini" data-ed="insB" title="喺揀咗嗰小節前面加（Insert）">前面</button><button class="mini" data-ed="insA" title="喺揀咗嗰小節後面加">後面</button><button class="mini" data-ed="insE" title="喺成首歌最尾加（Ctrl+B）">最尾</button></div>
       <div class="grp"><button class="mini" data-ed="undo" title="復原（Ctrl+Z）">↶ 復原</button><button class="mini" data-ed="redo" title="重做（Ctrl+Y）">↷ 重做</button></div>
       <span id="editInfo">撳譜上任何一粒音或休止符嚟揀</span><span id="edNotes"></span>
       <span style="flex:1"></span>
@@ -615,7 +616,12 @@ body.roll-keys .roll .legend, body.roll-keys .roll .roll-hint{display:none}
       <kbd>S</kbd><span>圓滑線（連奏，要先揀頭尾兩粒）</span>
       <kbd>Ctrl+Shift+↑ ↓</kbd><span>搬去右手 / 左手</span>
       <kbd>Ctrl+Z / Ctrl+Y</kbd><span>復原 / 重做</span>
-      <kbd>Ctrl+C / X / V</kbd><span>複製 / 剪下 / 貼上揀咗嘅音（撳第一粒、Shift+撳最後一粒揀一段）；另一個視窗、另一個瀏覽器嘅另一首歌都貼得；成個小節（所有譜行）用「小節 ▾」</span>
+      <kbd>Ctrl+A</kbd><span>全選（所有譜行、所有音）</span>
+      <kbd>Shift+→ / Ctrl+→</kbd><span>由揀咗嗰度逐粒揀多啲（撳實就一路揀落去）；Shift+← 縮返；揀咗高音同低音譜就兩行一齊伸長</span>
+      <kbd>Ctrl+Shift+→ ←</kbd><span>逐個小節揀多啲 / 縮返</span>
+      <kbd>Shift+撳另一行</kbd><span>變成幾行一齊揀（例如右手 + 左手）</span>
+      <kbd>Ctrl+C / X / V</kbd><span>複製 / 剪下 / 貼上揀咗嘅音：撳要貼嘅位置（音符、休止符或者譜上空位）再 Ctrl+V；幾行一齊複製就幾行一齊貼；另一個視窗、另一個瀏覽器嘅另一首歌都貼得</span>
+      <kbd>Insert / Ctrl+B</kbd><span>喺揀咗嗰小節前面加一個空小節 / 喺最尾加一個空小節（工具列「＋ 小節」可以一次加幾個）</span>
       <kbd>L</kbd><span>歌詞：打字，空格 / - = 下一粒音，Shift+空格 = 上一粒，Enter = 完成；中文揀咗字自動跳下一粒</span>
       <kbd>撳下面琴鍵</kbd><span>揀咗休止符 → 變做嗰粒音；揀咗音符 → 換音（Shift+撳 = 加和音）</span>
       <kbd>Esc</kbd><span>取消揀選</span>
@@ -3962,6 +3968,8 @@ $('btnSnd').onclick=async()=>{ AudioUnlock.kick();
 $('btnRestart').onclick=()=>{ seekQ(0); $('scoreWrap').scrollTo({top:0,behavior:'smooth'}); };
 document.addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
   if(S.editing && Ed.key(e)){ e.preventDefault(); return; }
+  // 未開「編輯譜」都撳 Ctrl+A：自動開編輯模式再全選
+  if(!S.editing && S.arr && (e.ctrlKey||e.metaKey) && !e.shiftKey && !e.altKey && (e.key==='a'||e.key==='A') && !isTextTarget(e.target) && !document.querySelector('.modal:not([hidden])')){ e.preventDefault(); Ed.start(); setTimeout(()=>Ed.selectAll(),60); return; }
   if(e.code==='Space'){ e.preventDefault(); S.playing?pause():play(); }
   if(e.code==='ArrowLeft') seekQ(curQ()-(S.an?.B||4)); if(e.code==='ArrowRight') seekQ(curQ()+(S.an?.B||4)); });
 const SPEEDS=[0.25,0.5,0.6,0.75,0.9,1,1.25,1.5];
@@ -4116,21 +4124,27 @@ const Ed = (()=>{
   }
   function info(){ chips();
     if(multi){ const ns=multiNotes(), b0=Math.min(...multi.map(x=>x.bar)), b1=Math.max(...multi.map(x=>x.bar));
-      $('editInfo').textContent=ns.length?`框選咗 ${ns.length} 粒音（第 ${b0+1}${b1>b0?'–'+(b1+1):''} 小節）：Delete 一次過刪、↑↓ 移調、Ctrl+↑↓ 八度、「→ 右手 / 左手」搬`:`框選咗第 ${b0+1}${b1>b0?'–'+(b1+1):''} 小節（得休止符）：撳 Delete = 成個小節刪走`; return; }
+      const vs=[...new Set(multi.map(x=>x.voice))].map(vLabel).join(' + ');
+      $('editInfo').textContent=ns.length?`揀咗 ${vs} ${ns.length} 粒音（第 ${b0+1}${b1>b0?'–'+(b1+1):''} 小節）：Shift+→ 揀多啲、Shift+← 縮返；Ctrl+C 複製；Delete 刪、↑↓ 移調、Ctrl+↑↓ 八度`:`框選咗第 ${b0+1}${b1>b0?'–'+(b1+1):''} 小節（得休止符）：撳 Delete = 成個小節刪走`; return; }
     const m=pieceOf(sel); if(!sel||!m){ $('editInfo').textContent=addMode?'加音模式：撳五線譜上面想加音嘅位置（休止符 = 加新音；有音嘅位置 = 加做和弦；Shift+撳 = 換音）':'撳譜上任何一粒音或休止符嚟揀；喺空白位拖一個框可以揀一大拃音'; return; }
     const beat=Math.floor(m.piece.pos/4)+1, f=S.arr.key.fifths;
     const what=m.piece.rest?'休止符（打 A–G 加音）':selNotes().map(n=>Core.noteLabel(n.pitch,f)).join(' ');
     const d=m.piece.rest?m.piece.d:(selNotes()[0]?selNotes()[0].e-selNotes()[0].s:m.piece.d);
     $('editInfo').textContent=`${vLabel(sel.voice)} · 第 ${m.bar+1} 小節第 ${beat} 拍 · ${what} · ${durName(d)}${sel2?' → 已揀第二粒（可畫圓滑線）':''}`;
   }
-  function select(m, shift){ if(!m) return; multi=null; if(shift && sel && m.voice===sel.voice){ sel2=selFrom(m); } else { sel=selFrom(m); sel2=null; }
+  function select(m, shift){ if(!m) return;
+    // Shift+撳：已經揀咗一段（或者撳另一行）→ 變成範圍選擇，幾行一齊揀（高音 + 低音譜）
+    if(shift && (sel||multi)){ const live=!!(R && R.m===multi && multi), r0=curRange();
+      if(r0 && (live || multi || m.voice!==sel.voice)){ const O=voiceOrder(), ix=[...r0.vs, m.voice].map(v=>O.indexOf(v)).filter(i=>i>=0);
+        setRange({vs:O.slice(Math.min(...ix), Math.max(...ix)+1), lo:Math.min(r0.lo,absStep(m)), hi:Math.max(r0.hi,pEnd(m)), cur:'hi'}); return; } }
+    multi=null; R=null; if(shift && sel && m.voice===sel.voice){ sel2=selFrom(m); } else { sel=selFrom(m); sel2=null; }
     paint(); const ns=m.piece.rest?[]:(m.piece.notes||[]); if(ns.length && window.Tone){ ensureSampler().then(()=>ns.forEach(n=>sampler.triggerAttackRelease(Tone.Frequency(n.pitch,'midi').toNote(),0.4,undefined,0.7))); } }
-  function click(el, ev){ if(suppress) return; if(el && el.el_type==='clef' && ev){ clefClick(ev); return; } const sc=el&&el.startChar, ec=el&&el.endChar; if(sc==null) return;
+  function click(el, ev){ if(suppress) return; lastClickAt=performance.now(); if(el && el.el_type==='clef' && ev){ clefClick(ev); return; } const sc=el&&el.startChar, ec=el&&el.endChar; if(sc==null) return;
     const m=entries().find(m=>sc<m.e && ec>m.s); if(!m) return; select(m, ev&&ev.shiftKey);
     // 撳中和弦入面其中一粒符頭 → 只揀嗰粒（Delete 就淨係刪佢）
     if(ev && !ev.shiftKey && !m.piece.rest && (m.piece.notes||[]).length>1){ const h=hitAt(ev); if(h && h.g.m===m){ const ns=[...m.piece.notes].sort((a,b)=>a.pitch-b.pitch);
         let bi=0; ns.forEach((n,i)=>{ if(Math.abs(n.pitch-h.pitch)<Math.abs(ns[bi].pitch-h.pitch)) bi=i; }); if(Math.abs(ns[bi].pitch-h.pitch)<=2){ sel.focus=bi; paint(); } } } }
-  function nav(dir){ const m=pieceOf(sel); if(!m) return; const L=voiceList(sel.voice); const i=L.findIndex(x=>x===m); const n=L[i+dir]; if(n){ sel=selFrom(n); sel2=null; paint(); scrollTo(n); } }
+  function nav(dir){ const m=pieceOf(sel); if(!m) return; multi=null; R=null; const L=voiceList(sel.voice); const i=L.findIndex(x=>x===m); const n=L[i+dir]; if(n){ sel=selFrom(n); sel2=null; paint(); scrollTo(n); } }
   function scrollTo(m){ const els=[...document.querySelectorAll('#paper .sel')]; if(els[0]) els[0].scrollIntoView({block:'nearest',behavior:'smooth'}); }
   function swapHand(){ if(!sel) return; const vs=[...new Set(entries().map(m=>m.voice))]; const v=vs.length>1?vs[(vs.indexOf(sel.voice)+1)%vs.length]:(sel.voice==='RH'?'LH':'RH'); const L=voiceList(v); const m=L.filter(x=>absStep(x)<=sel.step).pop()||L[0]; if(m){ sel=selFrom(m); sel2=null; paint(); } }
   function nearest(pc, ref){ let best=null; for(let o=1;o<=8;o++){ const p=12*o+pc; if(p<21||p>108) continue; if(best==null||Math.abs(p-ref)<Math.abs(best-ref)) best=p; } return best; }
@@ -4228,17 +4242,23 @@ const Ed = (()=>{
       if(kind==='clearOrn'){ ns.forEach(n=>delete n.orn); S.arr.hairpins=(S.arr.hairpins||[]).filter(x=>!ns.some(n=>n.id===x.a||n.id===x.b)); }
       else { const on=!ns.every(n=>n.orn===kind); ns.forEach(n=>{ if(on) n.orn=kind; else delete n.orn; }); }
       changed(); },
-    bars(kind){ const a=S.arr, bs=a.barSteps, m=multi?multi[0]:pieceOf(sel), m2=multi?multi[multi.length-1]:pieceOf(sel2);
+    bars(kind, cnt){ const a=S.arr, bs=a.barSteps, m=multi?multi[0]:pieceOf(sel), m2=multi?multi[multi.length-1]:pieceOf(sel2);
       if(kind.startsWith('tr')){ const d=+kind.slice(2); snap(); transpose(d); changed(); flash(`成份譜移咗 ${d>0?'+':''}${d} 個半音（調號：${S.arr.key.name}）`); return; }
-      if(!m && kind!=='paste'){ flash('先撳譜上一粒音或者休止符（揀小節）；想揀幾個小節：Shift+撳，或者拖一個框'); return; }
+      if(!m && /^ins/.test(kind)) kind='insEnd';
+      if(!m && kind!=='paste' && kind!=='insEnd'){ flash('先撳譜上一粒音或者休止符（揀小節）；想揀幾個小節：Shift+撳，或者拖一個框'); return; }
       let b0=m?Math.min(m.bar, m2?m2.bar:m.bar):0, b1=m?Math.max(m.bar, m2?m2.bar:m.bar):0; if(multi){ b0=Math.min(...multi.map(x=>x.bar)); b1=Math.max(...multi.map(x=>x.bar)); } const n=b1-b0+1;
       const shiftMarks=(from,by)=>{ shiftClefs(from,by); const M=JSON.parse(JSON.stringify(S.marks||{})); for(const k in M){ const o={}; for(const x in M[k]){ const xi=+x; if(by<0 && xi>=from && xi<from-by) continue; o[xi>=from?xi+by:xi]=M[k][x]; } M[k]=o; } S.marks=M;
         const KC={}; for(const x in (S.keyCh||{})){ const xi=+x; if(by<0 && xi>=from && xi<from-by) continue; KC[xi>=from?xi+by:xi]=S.keyCh[x]; } S.keyCh=KC;
         S.layout.lines={}; };
       const lists=()=>[a.rh, a.lh, ...(a.parts||[]).map(p=>p.notes)];
-      if(kind==='insBefore'||kind==='insAfter'){ const at=(kind==='insBefore'?b0:b1+1)*bs; snap();
-        for(const L of lists()) for(const x of L){ if(x.s>=at-1e-6){ x.s+=bs; x.e+=bs; } else if(x.e>at) x.e=at; }
-        a.chords.splice(at/bs,0,[null]); if(a.dyn) a.dyn.splice(at/bs,0,null); shiftMarks(at/bs,1); a.minBars=a.totalBars+1; changed(); flash('插入咗一個空小節'); return; }
+      if(kind==='insBefore'||kind==='insAfter'||kind==='insEnd'){ const c=Math.max(1,Math.min(64,Math.round(+cnt)||1)), atBar=kind==='insEnd'?a.totalBars:kind==='insBefore'?b0:b1+1, at=atBar*bs; snap();
+        if(multi){ multi=null; R=null; }
+        for(const L of lists()) for(const x of L){ if(x.s>=at-1e-6){ x.s+=c*bs; x.e+=c*bs; } else if(x.e>at) x.e=at; }
+        while(a.chords.length<atBar) a.chords.push([null]); a.chords.splice(atBar,0,...Array.from({length:c},()=>[null]));
+        if(a.dyn) a.dyn.splice(atBar,0,...Array(c).fill(null)); if(atBar<a.totalBars) shiftMarks(atBar,c); else S.layout.lines={};
+        a.minBars=a.totalBars+c; const v=(m&&m.voice)||voiceOrder()[0]; changed();
+        const t=voiceList(v).find(x=>x.bar===atBar); if(t){ sel=selFrom(t); sel2=null; paint(); scrollTo(t); }
+        flash(`${kind==='insEnd'?'喺最尾':kind==='insBefore'?`喺第 ${atBar+1} 小節前面`:`喺第 ${atBar} 小節後面`}加咗 ${c} 個空小節（已經揀咗第一個新小節，可以直接入音）`); return; }
       if(kind==='delBar'){ if(n>=a.totalBars){ flash('唔可以刪晒全部小節'); return; } const s0=b0*bs, s1=(b1+1)*bs; snap(); multi=null;
         for(const L of lists()){ for(let i=L.length-1;i>=0;i--){ const x=L[i]; if(x.s>=s0-1e-6 && x.s<s1-1e-6){ L.splice(i,1); continue; } if(x.s>=s1-1e-6){ x.s-=n*bs; x.e-=n*bs; } else if(x.e>s0) x.e=Math.min(x.e,s0)>x.s?Math.min(x.e,s0):x.e; } }
         a.chords.splice(b0,n); if(a.dyn) a.dyn.splice(b0,n); shiftMarks(b0,-n); a.minBars=Math.max(1,a.totalBars-n); sel=sel2=null; changed(); flash(`刪咗 ${n} 個小節`); return; }
@@ -4260,11 +4280,11 @@ const Ed = (()=>{
     lyVerse(v){ lyV=v; $('edLyV').value=String(v); if(lyOpen) lyOpenAt(lyOpen.id); },
     lyPaste(){ const m=pieceOf(sel); if(!m || m.piece.rest){ flash('先撳要開始填歌詞嗰粒音'); return; } $('lyDV').value=String(lyV);
       $('lyFrom').textContent=`由「${vLabel(sel.voice)}」第 ${m.bar+1} 小節開始`; $('lyDlg').hidden=false; setTimeout(()=>$('lyText').focus(),30); },
-    undo(){ if(!undo.length) return; redo.push(JSON.stringify(state())); restore(JSON.parse(undo.pop())); changed(); },
-    redo(){ if(!redo.length) return; undo.push(JSON.stringify(state())); restore(JSON.parse(redo.pop())); changed(); },
+    undo(){ if(!undo.length) return; multi=null; R=null; redo.push(JSON.stringify(state())); restore(JSON.parse(undo.pop())); changed(); },
+    redo(){ if(!redo.length) return; multi=null; R=null; undo.push(JSON.stringify(state())); restore(JSON.parse(redo.pop())); changed(); },
   };
   /* ---- 加音模式（似 MuseScore：撳五線譜上面嘅位置加音）、框選、和弦入面揀一粒、譜號 ---- */
-  let multi=null, addMode=false, boxMode=false, geo=null, geoVis=null, lastIn=null, suppress=false;
+  let multi=null, addMode=false, boxMode=false, geo=null, geoVis=null, lastIn=null, suppress=false, lastClickAt=0;
   const CLEF_OFF={treble:0,'treble-8':0,bass:12,alto:6,tenor:8,perc:0};
   function geoGet(){ const vis=S.visual; if(geo && geoVis===vis) return geo; geoVis=vis; geo=[]; const eg=vis&&vis.engraver; if(!eg) return geo; const ents=entries();
     const boxOf=els=>{ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const el of els){ if(!el||!el.getBBox) continue; try{ const b=el.getBBox(); if(!b.width&&!b.height) continue; x0=Math.min(x0,b.x); y0=Math.min(y0,b.y); x1=Math.max(x1,b.x+b.width); y1=Math.max(y1,b.y+b.height); }catch(e){} } return x0>x1?null:{x0,y0,x1,y1}; };
@@ -4288,12 +4308,38 @@ const Ed = (()=>{
     if(g.m.piece.rest || ev.shiftKey) A.piano(pitch,false);
     else { const ns=g.m.piece.notes||[], ex=ns.find(n=>n.pitch===pitch); if(ex){ sel.focus=[...ns].sort((a,b)=>a.pitch-b.pitch).indexOf(ex); paint(); } else A.piano(pitch,true); }
     beep(pitch); }
-  function multiNotes(){ const out=[]; for(const m of multi||[]){ if(m.piece.rest) continue; const h=hand(m.voice); for(const n of (m.piece.notes||[])){ const x=h.find(y=>y.id===n.id); if(x) out.push({v:m.voice, n:x}); } } return out; }
+  function multiNotes(){ const out=[], seen=new Set(); for(const m of multi||[]){ if(m.piece.rest) continue; const h=hand(m.voice); for(const n of (m.piece.notes||[])){ if(seen.has(n.id)) continue; const x=h.find(y=>y.id===n.id); if(x){ seen.add(n.id); out.push({v:m.voice, n:x}); } } } return out; }   // 連音線跨小節嗰粒唔好計兩次
   function remap(old){ const ids=new Set(); for(const m of old||[]) for(const n of (m.piece.notes||[])) ids.add(n.id); const ents=entries().filter(m=>!m.piece.rest && (m.piece.notes||[]).some(n=>ids.has(n.id))); return ents.length?ents:null; }
   function boxSelect(r){ const a=svgPt({clientX:Math.min(r.x0,r.x1), clientY:Math.min(r.y0,r.y1)}), b=svgPt({clientX:Math.max(r.x0,r.x1), clientY:Math.max(r.y0,r.y1)}); if(!a||!b) return;
     const hit=geoGet().filter(g=>g.x1>=a.x && g.x0<=b.x && g.y1>=a.y && g.y0<=b.y).map(g=>g.m); const uniq=[...new Set(hit)];
-    if(!uniq.length){ multi=null; paint(); return; } if(uniq.length===1){ select(uniq[0]); return; }
+    R=null; if(!uniq.length){ multi=null; paint(); return; } if(uniq.length===1){ select(uniq[0]); return; }
     uniq.sort((x,y)=>x.voice<y.voice?-1:x.voice>y.voice?1:absStep(x)-absStep(y)); multi=uniq; sel=selFrom(uniq[0]); sel2=null; paint(); }
+  /* ---- 範圍選擇（似 MuseScore）：Ctrl+A 全選；Shift+→ / Ctrl+→ 逐粒伸長、Shift+← 縮返；Ctrl+Shift+→ 逐個小節；Shift+撳另一行 = 幾行一齊揀 ---- */
+  let R=null;   // {vs:[譜行，由上至下], lo, hi（步）, cur:'hi'|'lo' 邊一頭喺度郁, m:對應嘅 multi}
+  const pEnd=m=>absStep(m)+m.piece.d;
+  function voiceOrder(){ return [...new Set(entries().map(m=>m.voice))]; }
+  function rangeEnts(r){ return entries().filter(m=>r.vs.includes(m.voice) && absStep(m)>=r.lo-1e-6 && absStep(m)<r.hi-1e-6)
+    .sort((x,y)=>r.vs.indexOf(x.voice)-r.vs.indexOf(y.voice)||absStep(x)-absStep(y)); }
+  function setRange(r, scrollEnd){ const ents=rangeEnts(r); if(!ents.length) return false; multi=ents; R={...r, cur:r.cur||'hi', m:multi};
+    const first=ents.find(m=>!m.piece.tiedFrom)||ents[0]; sel=selFrom(first); sel2=null; paint();
+    if(scrollEnd){ const tgt=R.cur==='lo'?ents.reduce((a,b)=>absStep(b)<absStep(a)?b:a):ents.reduce((a,b)=>absStep(b)>=absStep(a)?b:a);
+      const g=geoGet().find(x=>x.m===tgt), el=g&&g.c.elemset&&g.c.elemset[0]; if(el&&el.scrollIntoView) el.scrollIntoView({block:'nearest', inline:'nearest'}); }
+    return true; }
+  function curRange(){ if(R && R.m===multi && multi) return R;
+    if(multi && multi.length){ const vs=voiceOrder().filter(v=>multi.some(m=>m.voice===v)); return {vs, lo:Math.min(...multi.map(absStep)), hi:Math.max(...multi.map(pEnd)), cur:'hi'}; }
+    const m=pieceOf(sel); if(!m) return null; const m2=(sel2&&sel2.voice===sel.voice)?pieceOf(sel2):null;
+    return {vs:[sel.voice], lo:m2?Math.min(absStep(m),absStep(m2)):absStep(m), hi:m2?Math.max(pEnd(m),pEnd(m2)):pEnd(m), cur:'hi'}; }
+  function extend(dir, byBar){ const r0=curRange(); if(!r0) return; const r={...r0}, bs=S.arr.barSteps, ents=entries(), total=Math.max(...ents.map(pEnd));
+    const B=[...new Set(ents.filter(m=>r.vs.includes(m.voice)).flatMap(m=>[absStep(m),pEnd(m)]).map(x=>+x.toFixed(4)))].sort((a,b)=>a-b);
+    const next=x=>byBar?Math.min(total,(Math.floor(x/bs+1e-6)+1)*bs):B.find(b=>b>x+1e-6);
+    const prev=x=>byBar?Math.max(0,(Math.ceil(x/bs-1e-6)-1)*bs):[...B].reverse().find(b=>b<x-1e-6);
+    if(dir>0){ if(r.cur==='lo'){ const n=next(r.lo); if(n!=null && n<r.hi-1e-6) r.lo=n; else { r.cur='hi'; const h=next(r.hi); if(h!=null) r.hi=h; } }
+      else { const h=next(r.hi); if(h==null || h<=r.hi+1e-6){ flash('已經揀到最尾'); return; } r.hi=h; } }
+    else { if(r.cur==='hi'){ const p=prev(r.hi); if(p!=null && p>r.lo+1e-6) r.hi=p; else { r.cur='lo'; const l=prev(r.lo); if(l!=null) r.lo=l; } }
+      else { const l=prev(r.lo); if(l==null || l>=r.lo-1e-6){ flash('已經揀到最頭'); return; } r.lo=l; } }
+    setRange(r, true); }
+  function selectAll(){ const vs=voiceOrder(); if(!vs.length) return; const ents=entries(), total=Math.max(...ents.map(pEnd));
+    if(setRange({vs, lo:0, hi:total, cur:'hi'})) flash(`全選咗 ${multiNotes().length} 粒音（${vs.map(vLabel).join(' + ')}）：Ctrl+C 複製，撳要貼嘅位置再 Ctrl+V`); }
   function delBars(b0,b1){ const keep=multi; multi=[...entries().filter(m=>m.bar===b0)].slice(0,1).concat(entries().filter(m=>m.bar===b1).slice(0,1)); if(multi.length<1){ multi=keep; return; } A.bars('delBar'); multi=null; }
   function shiftClefs(from,by){ const a=S.arr, C=a.clefs||{}, out={}; for(const v in C){ out[v]={}; for(const k in C[v]){ const ki=+k; if(by<0 && ki>=from && ki<from-by) continue; out[v][ki>=from&&ki>0?ki+by:ki]=C[v][k]; } } a.clefs=out; }
   function setClef(v, bar, c){ const a=S.arr; snap(); a.clefs=JSON.parse(JSON.stringify(a.clefs||{})); const C=a.clefs[v]=a.clefs[v]||{};
@@ -4319,13 +4365,16 @@ const Ed = (()=>{
       let clefZone=false; if(!onEl && !boxMode){ const h=hitAt(ev); if(h){ const st=h.g.st, step=(st.bottomLine-st.topLine)/8, line=geoGet().filter(x=>x.st===st), minX=Math.min(...line.map(x=>x.x0));
           clefZone=h.p.x<minX-8 && h.p.y>st.topLine-3*step && h.p.y<st.bottomLine+3*step; } }
       if(onEl && !boxMode) return; if(ev.pointerType!=='mouse' && !boxMode && !clefZone) return;
-      bx={x0:ev.clientX, y0:ev.clientY, x1:ev.clientX, y1:ev.clientY, id:ev.pointerId, on:false, clef:clefZone, cx:ev.clientX, cy:ev.clientY, touch:ev.pointerType!=='mouse' && !boxMode}; }, true);
+      bx={x0:ev.clientX, y0:ev.clientY, x1:ev.clientX, y1:ev.clientY, id:ev.pointerId, on:false, clef:clefZone, cx:ev.clientX, cy:ev.clientY, touch:ev.pointerType!=='mouse' && !boxMode, shift:ev.shiftKey}; }, true);
     window.addEventListener('pointermove', ev=>{ if(!bx || ev.pointerId!==bx.id) return; bx.x1=ev.clientX; bx.y1=ev.clientY; if(!bx.on && Math.hypot(bx.x1-bx.x0, bx.y1-bx.y0)<6) return;
       if(bx.touch){ bx=null; return; }   // iPad 冇開框選：手指拖 = 捲動
       bx.on=true; ev.preventDefault(); if(!rect){ rect=document.createElement('div'); rect.className='boxsel'; document.body.appendChild(rect); }
       Object.assign(rect.style,{left:Math.min(bx.x0,bx.x1)+'px', top:Math.min(bx.y0,bx.y1)+'px', width:Math.abs(bx.x1-bx.x0)+'px', height:Math.abs(bx.y1-bx.y0)+'px'}); }, {passive:false});
     const end=ev=>{ if(!bx || ev.pointerId!==bx.id) return; const b=bx; bx=null; if(rect){ rect.remove(); rect=null; }
-      if(!b.on){ if(b.clef && ev.type==='pointerup'){ suppress=true; setTimeout(()=>suppress=false,300); clefClick({clientX:b.cx, clientY:b.cy}); } return; }
+      if(!b.on){ if(b.clef && ev.type==='pointerup'){ suppress=true; setTimeout(()=>suppress=false,300); clefClick({clientX:b.cx, clientY:b.cy}); return; }
+        // 撳五線譜上面嘅空位（唔係正正撳中粒音）：揀返最近嗰格 → 可以喺度 Ctrl+V 貼上
+        if(ev.type==='pointerup' && !b.touch){ const t0=performance.now(); setTimeout(()=>{ if(lastClickAt>=t0-50) return; const h=hitAt({clientX:b.cx, clientY:b.cy}); if(h) select(h.g.m, b.shift); },40); }
+        return; }
       suppress=true; setTimeout(()=>suppress=false,300); boxSelect(b); };
     window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end); }
   /* ---- 轉調號 ---- */
@@ -4341,9 +4390,13 @@ const Ed = (()=>{
     const m=pieceOf(sel); if(!m) return null; const m2=(sel2 && sel2.voice===sel.voice)?pieceOf(sel2):null; let A1=m, B1=m2||m; if(absStep(B1)<absStep(A1)) [A1,B1]=[B1,A1];
     const endOf=x=>x.piece.rest?absStep(x)+x.piece.d:Math.max(absStep(x)+x.piece.d, ...(x.piece.notes||[]).map(n=>n.e));
     return {v:sel.voice, a:absStep(A1), b:endOf(B1)}; }
-  function copyNotes(cut){ const r=selRange();
-    // 框選咗幾行（例如鋼琴 + 大提琴）：當係複製成段小節
-    if(r && r.multiVoice){ if(cut){ flash('框選咗幾行：用「📋 複製」，再喺新位置貼上'); } A.bars('copy'); return null; }
+  function copyNotes(cut){ const r=selRange(), R0=curRange();
+    // 揀咗幾行（例如高音 + 低音譜、鋼琴 + 大提琴）：每行嗰段一齊複製，貼嘅時候一齊貼
+    if(R0 && R0.vs.length>1){ const len=R0.hi-R0.lo;
+      const voices=R0.vs.map(v=>({v, label:vLabel(v), notes:hand(v).filter(n=>n.s>=R0.lo-1e-6 && n.s<R0.hi-1e-6).map(n=>({...keepN(n), s:n.s-R0.lo, e:Math.min(n.e,R0.hi)-R0.lo}))}));
+      const cnt=voices.reduce((t,x)=>t+x.notes.length,0), t=clipPut({kind:'range', len, voices});
+      if(cut){ snap(); for(const v of R0.vs){ const L=hand(v); for(let i=L.length-1;i>=0;i--) if(L[i].s>=R0.lo-1e-6 && L[i].s<R0.hi-1e-6) L.splice(i,1); } multi=null; R=null; changed(); }
+      flash(`${cut?'剪咗':'複製咗'} ${voices.map(x=>x.label).join(' + ')} 共 ${cnt} 粒音（${+(len/4).toFixed(2)} 拍）。撳要貼嘅位置（一粒音或休止符），再 Ctrl+V /「📌 貼上」`); return t; }
     if(!r){ flash('先撳第一粒音，再 Shift+撳最後一粒，揀要複製嘅一段'); return null; } const L=hand(r.v);
     const ns=L.filter(n=>n.s>=r.a-1e-6 && n.s<r.b-1e-6).map(n=>({...keepN(n), s:n.s-r.a, e:n.e-r.a}));
     const t=clipPut({kind:'notes', len:r.b-r.a, notes:ns, from:vLabel(r.v)});
@@ -4352,6 +4405,15 @@ const Ed = (()=>{
   function putRange(L, src, s0, len){ for(let i=L.length-1;i>=0;i--){ const n=L[i]; if(n.s>=s0-1e-6 && n.s<s0+len-1e-6) L.splice(i,1); else if(n.s<s0 && n.e>s0) n.e=s0; }
     for(const n of src) L.push({...n, id:Core.nextId(), s:n.s+s0, e:n.e+s0, ly:n.ly?[...n.ly]:undefined}); }
   function pasteObj(o){ const a=S.arr, m=pieceOf(sel);
+    if(o.kind==='range'){ if(!m){ flash('先撳要貼去嘅位置（一粒音或者休止符）'); return; }
+      const O=voiceOrder(), v0=sel.voice, pos=absStep(m), bar=m.bar, beat=+(m.piece.pos/4+1).toFixed(2), ids=o.voices.map(x=>x.v);
+      // 原本嘅譜行呢份譜都有，而你撳嘅係其中一行 → 每行貼返落自己嗰行；否則由你撳嗰行開始，順住向下貼
+      const ident=ids.includes(v0) && ids.every(v=>O.includes(v)) && new Set(ids).size===ids.length, base=O.indexOf(v0);
+      const tg=o.voices.map((x,k)=>ident?x.v:O[base+k]), skip=tg.filter(t=>!t).length; snap(); const done=[]; let cnt=0;
+      o.voices.forEach((x,k)=>{ const t=tg[k]; if(!t) return; putRange(hand(t), x.notes, pos, o.len); done.push(t); cnt+=x.notes.length; });
+      a.minBars=Math.max(a.totalBars, Math.ceil((pos+o.len)/a.barSteps-1e-6)); changed();
+      setRange({vs:voiceOrder().filter(v=>done.includes(v)), lo:pos, hi:pos+o.len, cur:'hi'});
+      flash(`貼咗 ${cnt} 粒音落 ${done.map(vLabel).join(' + ')}（由第 ${bar+1} 小節第 ${beat} 拍開始）${skip?`；有 ${skip} 行冇地方貼（下面冇咁多行譜）`:''}。唔啱可以 Ctrl+Z`); return; }
     if(o.kind==='notes'){ if(!m){ flash('先撳要貼去嘅位置（一粒音或者休止符）'); return; } const v=sel.voice, pos=absStep(m), end=pos+o.len; snap();
       putRange(hand(v), o.notes, pos, o.len); a.minBars=Math.max(a.totalBars, Math.ceil(end/a.barSteps)); changed();
       const nx=voiceList(v).find(x=>absStep(x)>=end-1e-6); if(nx){ sel=selFrom(nx); sel2=null; paint(); }
@@ -4428,8 +4490,13 @@ const Ed = (()=>{
     if(ctrl && !e.shiftKey && (k==='v'||k==='V')){ clearTimeout(pasteTimer); pasteTimer=setTimeout(()=>{ const o=clipGet(); if(o) pasteObj(o); else flash('未複製嘢'); },90); return false; }
     if(sel && !ctrl && !e.altKey && (k==='l'||k==='L')){ A.lyric(); return true; }
     if(ctrl && (k==='y'||k==='Y'||((k==='z'||k==='Z')&&e.shiftKey))){ A.redo(); return true; }
-    if(k==='Escape'){ sel=sel2=null; multi=null; if(addMode) A.toggleAdd(false); paint(); return true; }
+    if(k==='Escape'){ sel=sel2=null; multi=null; R=null; if(addMode) A.toggleAdd(false); paint(); return true; }
     if(!ctrl && !e.altKey && (k==='n'||k==='N')){ A.toggleAdd(); return true; }
+    if(ctrl && !e.shiftKey && !e.altKey && (k==='a'||k==='A')){ selectAll(); return true; }
+    if(ctrl && !e.shiftKey && !e.altKey && (k==='b'||k==='B')){ A.bars('insEnd',1); return true; }
+    if(k==='Insert' && !ctrl){ A.bars('insBefore',1); return true; }
+    // Shift+→ / Ctrl+→：逐粒揀多啲（撳實就一路揀落去）；Ctrl+Shift+→：逐個小節；← 縮返
+    if((k==='ArrowRight'||k==='ArrowLeft') && (e.shiftKey||ctrl) && !e.altKey && (sel||multi)){ extend(k==='ArrowRight'?1:-1, ctrl&&e.shiftKey); return true; }
     if(multi){ if(k==='Delete'||k==='Backspace'){ A.del(); return true; } if(k==='ArrowUp'||k==='ArrowDown'){ const up=k==='ArrowUp'; if(ctrl && e.shiftKey){ A.move(up?'RH':'LH'); return true; } A.shift(ctrl?(up?12:-12):(up?1:-1)); return true; } }
     if(!sel) return false;
     if(k==='ArrowLeft'){ nav(-1); return true; } if(k==='ArrowRight'){ nav(1); return true; }
@@ -4453,7 +4520,7 @@ const Ed = (()=>{
     if(!localStorage.getItem('os.keysSeen')){ $('keysHelp').hidden=false; try{ localStorage.setItem('os.keysSeen','1'); }catch(e){} } }
   function stop(){ lyClose(); $('lyDlg').hidden=true; if(addMode) A.toggleAdd(false); if(boxMode) A.toggleBox(false); multi=null; S.editing=false; S.layoutEdit=false; $('lineEdit').checked=false; sel=sel2=null; document.body.classList.remove('editing'); $('btnEdit').classList.remove('on'); renderScore(); }
   return {click, key, paint, start, stop, A, snap, changed, reset(){ sel=sel2=null; multi=null; undo=[]; redo=[]; }, get multi(){ return multi; }, get addMode(){ return addMode; }, _hit:hitAt, _geo:()=>geoGet(), get sel(){ return sel; }, get curDur(){ return curDur; },
-    voiceNotes:hand, vLabel, clearSel(){ sel=sel2=null; }, keyAtBar,
+    voiceNotes:hand, vLabel, clearSel(){ sel=sel2=null; }, keyAtBar, selectAll, extend, _range:()=>R&&R.m===multi?R:null, _select:select,
     clipText(){ return Date.now()-lastClipAt<2000?lastClip:''; }, pasteFromEvent(o){ clearTimeout(pasteTimer); pasteObj(o); },
     // 揀第一格（新樂譜：一開始就可以撳琴鍵入音）
     selectFirst(v){ const vs=[...new Set(entries().map(m=>m.voice))]; const L=voiceList(v||vs[0]); if(L[0]){ sel=selFrom(L[0]); sel2=null; paint(); info(); } },
@@ -4472,7 +4539,8 @@ $('keysHelp').onclick=e=>{ if(e.target===$('keysHelp')) $('keysHelp').hidden=tru
 document.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{ const k=b.dataset.ed, A=Ed.A;
   ({del:()=>A.del(), up:()=>A.shift(1), down:()=>A.shift(-1), oup:()=>A.shift(12), odown:()=>A.shift(-12), dot:()=>A.dot(), stacc:()=>A.stacc(), accent:()=>A.accent(),
     tie:()=>A.tie(), slur:()=>A.slur(), trip:()=>A.trip(), toR:()=>A.move('RH'), toL:()=>A.move('LH'), undo:()=>A.undo(), redo:()=>A.redo(),
-    lyric:()=>A.lyric(), copy:()=>A.copy(false), cut:()=>A.copy(true), paste:()=>A.paste()})[k](); });
+    lyric:()=>A.lyric(), copy:()=>A.copy(false), cut:()=>A.copy(true), paste:()=>A.paste(), all:()=>Ed.selectAll(),
+    insB:()=>A.bars('insBefore', +$('edBarN').value), insA:()=>A.bars('insAfter', +$('edBarN').value), insE:()=>A.bars('insEnd', +$('edBarN').value)})[k](); });
 $('edAdd').onclick=()=>Ed.A.toggleAdd(); $('edBox').onclick=()=>Ed.A.toggleBox();
 $('edClef').onchange=e=>{ const v=e.target.value; e.target.value=''; if(v) Ed.A.clef(v); };
 $('edKey').onchange=e=>{ const v=e.target.value; e.target.value=''; if(v) Ed.A.keyChange(v); };
