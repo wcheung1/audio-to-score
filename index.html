@@ -269,6 +269,12 @@ body.kb-open .app{grid-template-rows:auto auto minmax(0,1fr) auto;height:calc(10
 .trk small{color:var(--muted);font-size:11px;padding-left:5px}
 .trk select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 4px;color:var(--text);font-size:12.5px}
 .trk-presets{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.chbeau{border:1px solid #e5c7ff;background:#fbf6ff;border-radius:8px;padding:8px 10px;margin:8px 0}
+.chbeau .row{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:3px 0}
+.chbeau .bzopts label{font-size:13px;white-space:nowrap}
+.bzlog{max-height:180px;overflow:auto;font-size:12.5px;border-top:1px dashed #d7b5f5;margin-top:6px;padding-top:4px}
+.bzlog div{padding:2px 0}.bzlog b{color:#7b2fbf}.bzlog .go{cursor:pointer;color:#555;text-decoration:underline}
+.chchip.src-beau{color:#c2255c}
 .menu-pop .trk-presets button{display:inline-block;width:auto;border:1px solid var(--line);padding:5px 9px;font-size:12.5px}
 .trk-hint{color:var(--muted);font-size:11.5px;margin-top:8px;line-height:1.4}
 
@@ -804,6 +810,22 @@ body.roll-keys .roll .legend, body.roll-keys .roll .roll-hint{display:none}
       <button class="btn" id="chLibMgr">管理歌庫 ▾</button>
       <div id="chLibBox" hidden></div>
     </div>
+    <div class="chbeau">
+      <div class="row"><b>✨ 美化和弦</b><span class="muted">將而家啲和弦一步步加靚：先有簡單和弦（自動配、AI 配或者自己揀），再撳「✨ 美化」。旋律一粒都唔郁，重拍音規則照守，撞旋律嘅色彩音唔會加。</span></div>
+      <div class="row bzopts">
+        <label title="輕：add9、m7、7；中：再加 maj7、9；濃：9、11、13、6/9，副屬前面仲會加 ii">深淺 <select id="bzDepth"><option value="1">輕（add9・m7・7）</option><option value="2" selected>中（maj7・9）</option><option value="3">濃（9・11・13・ii–V）</option></select></label>
+        <label title="I → Cadd9 / Cmaj7、IV → Fmaj7、ii → Dm7、V → G7 / G9、vi → Am7…；加嘅音同旋律撞半音就唔加"><input type="checkbox" id="bzExt" checked> 7 / 9 / 11 色彩</label>
+        <label title="屬和弦（例如去 C 嘅 G）夠兩拍：前半 Gsus4、後半 G，旋律有 B 就唔掛"><input type="checkbox" id="bzSus" checked> sus4 → 解決</label>
+        <label title="揀轉位 / slash 令低音一步步行：C – G/B – Am – Am/G – F；樂句頭、終止式、頭尾用原位"><input type="checkbox" id="bzBass" checked> 低音級進（轉位・slash）</label>
+        <label title="喺目標和弦前面一兩拍插佢嘅屬七：→ Dm 前面 A7、→ Am 前面 E7、→ G 前面 D7；每兩小節最多一粒"><input type="checkbox" id="bzSec" checked> 副屬和弦（Secondary Dominant）</label>
+        <label title="根音行全音嘅地方插半音經過減七：C – C♯dim7 – Dm、G – G♯dim7 – Am"><input type="checkbox" id="bzDim"> 經過減七</label>
+        <label title="IV → I 嘅 IV 後半變小調 IVm6：F – Fm6 – C（好溫柔）；旋律有 A 就唔用"><input type="checkbox" id="bzBor"> 借用 IVm</label>
+        <label title="同一句旋律第二次出現：換做代理和弦（C → Am7 / Em7、F → Dm7、Am → Fmaj7），重複都唔悶"><input type="checkbox" id="bzSub"> 重複樂句換和弦（和弦重組）</label>
+        <label title="旋律最高嗰幾段（多數係副歌）深一級，主歌照揀嘅深淺"><input type="checkbox" id="bzSect" checked> 副歌濃啲、主歌淡啲</label>
+      </div>
+      <div class="row"><button class="btn primary" id="bzGo">✨ 美化</button><button class="btn" id="bzAB" title="由「由第 … 小節開始」嗰度播 4 小節：先播美化前、再播美化後">↔ 前後對比試聽</button><button class="btn" id="bzBack">↩ 返去美化前</button><span class="muted" id="bzMsg"></span></div>
+      <div id="bzLog" class="bzlog" hidden></div>
+    </div>
     <div class="muted" id="chMsg" style="min-height:18px"></div>
     <div class="chvers" id="chVers" hidden></div>
     <div class="chkb" id="chKb">
@@ -814,13 +836,18 @@ body.roll-keys .roll .legend, body.roll-keys .roll .roll-hint{display:none}
         <div class="chsec" id="chKbCandT">夾你揀嘅音、又夾呢格旋律嘅和弦（越前越推介）</div><div class="chopts" id="chKbCands"></div></div>
     </div>
     <div class="chgrid" id="chGrid"></div>
-    <div class="chlegend"><span><i class="ok"></i>綠 = 重拍音全部係和弦音</span><span><i class="col"></i>橙 = 重拍音係色彩音（9／maj7／6，周杰倫式張力）</span><span><i class="bad"></i>紅 = 有重拍音唔喺和弦入面（會撞）</span><span>藍字 = 你自己揀；紫字 = AI 揀；黑字 = 樂理自動配</span><span id="chStat"></span></div>
+    <div class="chlegend"><span><i class="ok"></i>綠 = 重拍音全部係和弦音</span><span><i class="col"></i>橙 = 重拍音係色彩音（9／maj7／6，周杰倫式張力）</span><span><i class="bad"></i>紅 = 有重拍音唔喺和弦入面（會撞）</span><span>藍字 = 你自己揀；紫字 = AI 揀；粉紅字 = ✨ 美化；黑字 = 樂理自動配</span><span id="chStat"></span></div>
     <h3>伴奏</h3>
     <div class="arrset">
       <label>伴奏型（全首） <select id="chPat"></select></label>
       <label>放喺 <select id="chPlace"><option value="staff">新增一行「伴奏」（原譜全部唔郁）</option><option value="lh">鋼琴左手（取代原本左手；右手旋律唔郁）</option><option value="cello">大提琴（新加一行，用「大提琴」伴奏型）</option></select></label>
       <label title="伴奏上面嗰幾粒音（唔計低音）整體高 / 低八度">和弦音高 <select id="chUpSh"><option value="-12">低八度（厚）</option><option value="0" selected>標準</option><option value="12">高八度（清）</option></select></label>
       <label title="低音太低會濁，可以揀高八度">低音 <select id="chBassSh"><option value="-12">低八度</option><option value="0" selected>標準</option><option value="12">高八度（清啲）</option></select></label>
+    </div>
+    <div class="arrset">
+      <label title="Cadd9 嘅 D、Fmaj7 嘅 E、Dm9 嘅 E… 都彈出嚟（唔開就淨係彈三和弦 + 7 度，比較清）"><input type="checkbox" id="chColor"> 伴奏彈埋色彩音（9・11・13）</label>
+      <label title="喺小節線換嘅和弦，伴奏提早半拍入（off beat 搶拍）；和弦名照寫喺拍頭"><input type="checkbox" id="chAnt"> 搶拍：換和弦提早半拍</label>
+      <label title="旋律長音 / 休止 ≥ 2 拍嗰度，加一句固定形狀嘅小句（8 分–8 分–4 分，由高至低行和弦音）；同一句套落每粒和弦（copy & paste），即興都似設計好"><input type="checkbox" id="chFill"> 🔁 空位加小句（同一句套落每粒和弦）</label>
     </div>
     <div class="chsegbox"><b>分段伴奏型</b> <span class="muted">（例如主歌抒情、副歌激昂；冇寫嘅小節用「全首」嗰個）</span>
       <div id="chSegs"></div>
@@ -3166,6 +3193,8 @@ const Harm = (() => {
     pop8:{zh:'流行 8 分柱式（低音 1、3 拍＋8 分和弦，激昂）', mood:'激昂'},
     s332:{zh:'3-3-2 切分（流行 / 搖滾抒情）', mood:'推進'},
     bossa:{zh:'Bossa Nova（低音 1–5 ＋ 切分和弦）', mood:'輕鬆'},
+    offbeat:{zh:'Off beat 拍子（低音打拍頭、和弦打後半拍「嘭–恰」）', mood:'推進'},
+    stab:{zh:'動態「鋤」Chord（重拍大力、切分短促，副歌用）', mood:'激昂'},
     learned:{zh:'📚 學返歌庫原曲嘅左手型（要先「學習」有左右手嘅譜）', mood:'原曲'},
     cello:{zh:'大提琴 / 低音聲部：每拍 1–5（屬和弦用 3 度、樂段尾八度落）', mood:'低音', bassOnly:true},
   };
@@ -3217,6 +3246,25 @@ const Harm = (() => {
         for(const n of f.ns){ const t=q+n.dq; if(t<a-1e-6 || t>=b-1e-6) continue; const pc=mapPc(n); const p=nearPc(pc, bp+n.iv); if(p==null) continue;
           out.push({pitch:p, qs:t, qe:Math.min(t+n.d, e.q1, t+2*L), vel:n.iv===0?70:54, hand:'l'}); } } }
     return out; }
+  // 搶拍（off beat）：喺小節線換嘅和弦，伴奏提早半拍入（和弦名照寫喺拍頭）
+  function anticipate(events, B, amt=0.5){ const ev=events.map(e=>({...e}));
+    for(let i=1;i<ev.length;i++){ const e=ev[i], p=ev[i-1]; if(Math.abs(mod(e.q0,B))>1e-6 || p.q1-p.q0<2*amt+1e-6 || Math.abs(p.q1-e.q0)>1e-6) continue; p.q1-=amt; e.q0-=amt; }
+    return ev; }
+  // 樂句空位加小句（copy & paste）：旋律長音 / 休止 ≥ 2 拍嗰度，加一句固定形狀嘅小句（8 分 – 8 分 – 4 分，由高至低行和弦音），
+  // 同一句「套」落每粒和弦：形狀一樣、音跟和弦變，所以即興都似設計好
+  function fills(events, melIn, o){ const B=o.B, beat=o.beatQ||1, mel=melIn.slice().sort((a,b)=>a.qs-b.qs), out=[], end=events.length?events[events.length-1].q1:0;
+    const shape=o.shape||[[0,0.5],[0.5,0.5],[1,1]]; const need=shape[shape.length-1][0]+shape[shape.length-1][1];
+    const evAt=q=>events.find(e=>e.q0<=q+1e-6 && e.q1>q+1e-6);
+    let lastQ=-1e9;
+    for(let i=0;i<mel.length;i++){ const n=mel[i], nx=mel[i+1], gapEnd=nx?nx.qs:end;
+      let q=Math.ceil((n.qs+beat-1e-6)/beat)*beat; if(q+need>gapEnd+1e-6 || q-lastQ<B-1e-6) continue;
+      const e=evAt(q); if(!e) continue; const held=n.qe>q+1e-6, top=(held?n.pitch-3:Math.min(n.pitch, nx?nx.pitch:n.pitch)-1);
+      const tones=pcsOf(e.root,e.suf); const cand=[]; for(let p=Math.min(top,79);p>=Math.max(55,top-14);p--) if(tones.includes(mod(p,12))) cand.push(p);
+      if(cand.length<shape.length) continue;
+      shape.forEach(([dq,d],k)=>{ const t=q+dq, ek=evAt(t)||e, tk=pcsOf(ek.root,ek.suf); let p=cand[k]; if(!tk.includes(mod(p,12))){ const alt=cand.find(x=>x<=cand[Math.max(0,k-1)] && tk.includes(mod(x,12))); if(alt!=null) p=alt; }
+        out.push({pitch:p, qs:t, qe:Math.min(t+d, gapEnd), vel:k===0?60:54, hand:'l', fill:true}); });
+      lastQ=q; }
+    return out; }
   function accomp(events, melIn, o){
     if(o.pattern==='cello') return cello(events, o);
     if(o.pattern==='learned'){ const raw=learnedAcc(events, melIn, o); return o.declash===false?raw:declash(raw, melIn.slice().sort((a,b)=>a.qs-b.qs), events); }
@@ -3231,22 +3279,32 @@ const Harm = (() => {
     for(const e of events){
       const len=e.q1-e.q0; if(len<=1e-6) continue;
       const tones=coreOf(e.root,e.suf).slice(0,4);                 // 只用骨幹音：三和弦 + 7 度
+      // 「伴奏彈埋色彩音」：9、11、13 都放入上面嘅和弦（低音已經有根音，上面先放 3、7、色彩音，五度最後先）
+      const allPc=pcsOf(e.root,e.suf), colPcs=o.color?allPc.filter(pc=>!tones.includes(pc)):[];
+      const colOrder=()=>{ const seen=new Set(), L0=[];
+        for(const x of [4,3,5,10,11]) { const pc=mod(e.root+x,12); if(allPc.includes(pc) && !seen.has(pc)){ seen.add(pc); L0.push(pc); } }
+        for(const pc of colPcs) if(!seen.has(pc)){ seen.add(pc); L0.push(pc); }
+        for(const x of [9,2,6,8,7]){ const pc=mod(e.root+x,12); if(allPc.includes(pc) && !seen.has(pc)){ seen.add(pc); L0.push(pc); } }
+        return L0.filter(pc=>pc!==mod(e.bass,12)||L0.length<=2); };
       const third=tones.find(pc=>[3,4].includes(mod(pc-e.root,12))), fifth=tones.find(pc=>[6,7,8].includes(mod(pc-e.root,12)));
       const bass=near(e.bass, pBass, 38, 50); pBass=bass;
       const ceil=Math.min(67, melLow(e.q0,e.q1)-3), floor=bass<48?Math.max(48,bass+7):bass+3;
       // 上面嘅和弦（close position）：揀同上一個最近嘅轉位；位唔夠（旋律好低）就減少音數，唔會同旋律撞
-      let want=(pat==='block'||pat==='hold')?tones.slice(0,4):tones.slice(0,3), up=[];
+      let want=(pat==='block'||pat==='hold'||pat.startsWith('rolled'))&&!colPcs.length?tones.slice(0,4):colPcs.length?colOrder().slice(0,(pat==='block'||pat==='hold'||pat.startsWith('rolled'))?4:3):tones.slice(0,3), up=[];
       const stack=(start,w)=>{ const v=[]; let x=start-1; for(let k=0;k<w.length;k++){ x++; let t=0; while(!w.includes(mod(x,12)) && t<13){ x++; t++; } v.push(x); } return v; };
       for(let tries=0; tries<3 && !up.length; tries++){
         const cands=[]; for(let st=floor; st<=ceil; st++){ if(!want.includes(mod(st,12))) continue; const v=stack(st,want); if(new Set(v.map(p=>mod(p,12))).size===want.length && v[v.length-1]<=ceil) cands.push(v); }
         if(cands.length) up=cands.reduce((A,Bv)=>{ const d=v=>pUp?v.reduce((t,p,i)=>t+Math.abs(p-(pUp[Math.min(i,pUp.length-1)])),0):Math.abs(v[0]-55); return d(Bv)<d(A)?Bv:A; });
-        else want=want.length>2?want.filter(pc=>pc!==(mod(e.bass-e.root,12)===0?e.root:fifth)).slice(0,want.length-1):want.slice(0,1); }
+        else want=colPcs.length?want.slice(0,Math.max(1,want.length-1)):want.length>2?want.filter(pc=>pc!==(mod(e.bass-e.root,12)===0?e.root:fifth)).slice(0,want.length-1):want.slice(0,1); }
       up=[...new Set(up)].sort((a,b)=>a-b); pUp=up;
       // 分解和弦用嘅音：x5 ≈ 低音上面五度嘅和弦音；x3 = 另一粒和弦音（低音低過 C3 就放高八度做 10 度，唔會濁）
       const pick=(ref,lo,hi,excl)=>{ let best=null; for(let p=lo;p<=hi;p++){ const pc=mod(p,12); if(!tones.includes(pc)||excl.includes(pc)) continue; if(best==null||Math.abs(p-ref)<Math.abs(best-ref)) best=p; } return best; };
       const p5=pick(bass+7,bass+5,bass+9,[mod(bass,12)]) ?? pick(bass+7,bass+3,bass+11,[mod(bass,12)]) ?? bass+12;
       const p3b=(bass<48?pick(bass+16,bass+13,bass+19,[mod(bass,12),mod(p5,12)]):pick(bass+4,bass+3,bass+11,[mod(bass,12),mod(p5,12)])) ?? p5+5;
       const p8=bass+12;
+      // 色彩音（9 → 7 → 6）代替分解和弦入面嘅八度：1-5-9-10、1-5-7-10，一聽就知加咗色彩
+      const cpc=colPcs.length?([2,11,10,9].map(x=>mod(e.root+x,12)).find(pc=>allPc.includes(pc)&&pc!==mod(bass,12))):null;
+      const p8c=cpc==null?p8:(()=>{ let best=p8; for(let p=bass+9;p<=bass+15;p++) if(mod(p,12)===cpc){ best=p; break; } return best<=melLow(e.q0,e.q1)-2?best:p8; })();   // 冇位放（旋律太低）就照用八度
       const at=(q)=>mod(q,B);
       if(pat==='oompah'){
         for(let q=e.q0;q<e.q1-1e-6;q+=beat){ const d=Math.min(beat,e.q1-q), first=q===e.q0||Math.abs(at(q))<1e-6, mid=B===4&&Math.abs(at(q)-2)<1e-6;
@@ -3256,7 +3314,7 @@ const Harm = (() => {
         const step=pat==='rolled'?(e.q1-e.q0):beat; for(let q=e.q0;q<e.q1-1e-6;q+=step){ const d=Math.min(step,e.q1-q); const k0=out.length;
           N(bass,q,q+d,q===e.q0?72:64); up.forEach(p=>N(p,q,q+d,q===e.q0?54:48)); for(let k=k0;k<out.length;k++) out[k].orn='arpeggio'; } }
       else if(pat==='block'){ N(bass,e.q0,e.q1,72); for(let q=e.q0;q<e.q1-1e-6;q+=beat){ const d=Math.min(beat,e.q1-q); up.forEach(p=>N(p,q,q+d*0.85,q===e.q0?56:50)); } }
-      else if(['jay8','q1585','octHalf','octBounce','syncOct','arp16','pop8','s332','bossa'].includes(pat)){
+      else if(['jay8','q1585','octHalf','octBounce','syncOct','arp16','pop8','s332','bossa','offbeat','stab'].includes(pat)){
         const HB=B%2===0&&B>=4?B/2:B;                                  // 半小節（4/4 = 2 拍）；3/4 就成小節
         const p10=(()=>{ const t=p3b>p8?p3b:p3b+12; return t>p8+9?t-12:t; })(), p12=p5+12, ob=bass+12;
         const lim=(p,q,d)=>{ const top=melLow(q,q+d)-2; while(p>top && p-12>bass) p-=12; return p>top?null:p; };
@@ -3264,27 +3322,192 @@ const Harm = (() => {
         for(let q=e.q0;q<e.q1-1e-6;){ const nb=Math.min(e.q1, Math.floor(q/HB+1e-6)*HB+HB); cells.push([q,nb]); q=nb; }
         for(const [a,b] of cells){ const L=b-a, first=a===e.q0;
           const hit=(rel,dur,ps,v)=>{ const q=a+rel; if(q>=b-1e-6) return; const d=Math.min(dur,b-q); for(const p of ps){ const pp=p===bass?p:p===ob?(ob<=melLow(q,q+d)-3?ob:null):lim(p,q,d); if(pp!=null) N(pp,q,q+d*0.95,v); } };
-          if(pat==='jay8'){ const seq=[[bass],[p5],[p8,p10],[p5]]; for(let k=0;k*0.5<L-1e-6;k++) hit(k*0.5,0.5,seq[k%4],k===0?70:k%4===2?54:48); }
-          else if(pat==='q1585'){ const seq=[[bass],[p5],[p8],[p5]]; for(let k=0;k<L-1e-6;k++) hit(k,1,seq[k%4],k===0?70:50); }
+          if(pat==='jay8'){ const seq=[[bass],[p5],[p8c,p10],[p5]]; for(let k=0;k*0.5<L-1e-6;k++) hit(k*0.5,0.5,seq[k%4],k===0?70:k%4===2?54:48); }
+          else if(pat==='q1585'){ const seq=[[bass],[p5],[p8c],[p5]]; for(let k=0;k<L-1e-6;k++) hit(k,1,seq[k%4],k===0?70:50); }
           else if(pat==='octHalf'){ hit(0,L,[bass,ob],first?72:64); }
           else if(pat==='octBounce'){ for(let k=0;k<L-1e-6;k++) hit(k,1,[k%2?ob:bass],k===0?70:56); }
           else if(pat==='syncOct'){ hit(0,0.5,[bass],70); hit(0.5,1,[ob],56); hit(1.5,0.5,[bass],60); if(L>2) hit(2,L-2,[bass],60); }
-          else if(pat==='arp16'){ const seq=[bass,p5,p8,p10,p12,p10,p8,p5]; for(let k=0;k*0.25<L-1e-6;k++) hit(k*0.25,0.25,[seq[k%8]],k===0?68:k%4===0?54:44); }
+          else if(pat==='arp16'){ const seq=[bass,p5,p8c,p10,p12,p10,p8,p5]; for(let k=0;k*0.25<L-1e-6;k++) hit(k*0.25,0.25,[seq[k%8]],k===0?68:k%4===0?54:44); }
           else if(pat==='pop8'){ hit(0,L,[bass,ob],72); for(let k=1;k*0.5<L-1e-6;k++) hit(k*0.5,0.4,up,k%2?46:52); }
           else if(pat==='s332'){ const H=[0,1.5,3].map(x=>x-mod(a,B)).filter(x=>x>=-1e-6 && x<L-1e-6); if(first && !H.some(x=>Math.abs(x)<1e-6)) H.unshift(0);
             H.forEach((x,i)=>{ const d=(H[i+1]??L)-x; hit(x,d,[bass].concat(up),i===0?70:60); }); }
           else if(pat==='bossa'){ hit(0,1.5,[bass],68); hit(1.5,0.5,[p5-12>=36?p5-12:p5],56); hit(0.5,0.5,up,46); hit(1.5,0.5,up,50); }
+          else if(pat==='offbeat'){ for(let k=0;k<L-1e-6;k++){ if(k%2===0) hit(k,0.5,[k===0?bass:(p5-12>=36?p5-12:bass)],k===0?72:62); else hit(k,0.45,[bass],52); hit(k+0.5,0.4,up,k===0?56:50); } }
+          else if(pat==='stab'){ // 「鋤」：拍頭成粒和弦大力短促，後半拍切分輕啲；半小節最尾嗰下推去下一粒
+            const v0=first?86:78; hit(0,0.45,[bass,ob].concat(up),v0); if(L>=2-1e-6){ hit(1.5,0.35,up,60); } else if(L>=1-1e-6) hit(0.5,0.35,up,58); }
         } }
       else { // 八分音符分解
-        const seq=pat==='alberti'?[bass,p5,p3b,p5]:pat==='b1585'?[bass,p5,p8,p5]:[bass,p5,p8,p3b+(p3b<p8?12:0),p8,p5];
+        const seq=pat==='alberti'?[bass,p5,p3b,p5]:pat==='b1585'?[bass,p5,p8c,p5]:[bass,p5,p8c,p3b+(p3b<p8?12:0),p8,p5];
         let k=0; for(let q=e.q0;q<e.q1-1e-6;q+=0.5,k++){ const d=Math.min(0.5,e.q1-q); let p=seq[k%seq.length]; const top=melLow(q,q+d)-2; if(p!==bass && p>top){ p-=12; if(p<=bass) continue; } N(p, q, q+d*0.95, k===0?70:k%2?50:56); } }
     }
     return out;
   }
-  return {learnSong, memOf, memMatch, cello, colorCost, harmonizeKeys, TEMPLATES, applyTemplates, PATTERNS, accomp, PRESETS, VERSIONS, DEV, CPX, roman, coreOf, mustOK, mustFor:Harm_must, harmonize, alternatives, prepare, stateFor, notesIn, fit, unary, trans, pcsOf, buildStates, pathScore, viterbi, finish, toEvents, ornament};
+  return {anticipate, fills, learnSong, memOf, memMatch, cello, colorCost, harmonizeKeys, TEMPLATES, applyTemplates, PATTERNS, accomp, PRESETS, VERSIONS, DEV, CPX, roman, coreOf, mustOK, mustFor:Harm_must, harmonize, alternatives, prepare, stateFor, notesIn, fit, unary, trans, pcsOf, buildStates, pathScore, viterbi, finish, toEvents, ornament};
 })();
 if(typeof module!=='undefined'){ module.exports.Harm=Harm; }
 /* ==HARM END== */
+/* ==BEAU START== */
+/* 美化和弦：旋律一粒都唔郁，將而家嘅和弦一步步加靚（色彩音 7 / 9 / 11、sus4 解決、低音級進、副屬、經過減七、借用 IVm、重複樂句換和弦、副歌濃啲）。
+   每一步都會檢查：重拍音一定喺和弦骨幹入面（「重拍音一定係和弦音」開咗嘅話）、加落去嘅音唔會同旋律撞半音、唔會同低音撞小九度。純運算，可以喺 Node 測試。 */
+const Beau=(()=>{
+  const mod=(a,n)=>((a%n)+n)%n, EPS=1e-6, H=Harm;
+  const pcs=(r,s)=>H.pcsOf(r,s), core=(r,s)=>H.coreOf(r,s);
+  const CPX=s=>H.CPX[s]??1;
+  const triOf=s=>(s==='dim'||s==='m7b5'||s==='dim7')?'dim':(s==='aug'||s==='7#5')?'aug':(s.startsWith('sus')||/sus/.test(s))?'sus':(s.startsWith('m')&&!s.startsWith('maj'))?'m':'';
+  const isDomSuf=s=>['','7','9','13','7b9','7#9','7b13','13b9'].includes(s);
+  const scaleOf=key=>new Set((key.mode==='minor'?[0,2,3,5,7,8,10,11]:[0,2,4,5,7,9,11]).map(i=>mod(key.tonic+i,12)));
+  const pcDist=(a,b)=>{ const d=mod(a-b,12); return Math.min(d,12-d); };
+  const WHY={ext:'加色彩音', sus:'掛四解決', bass:'低音級進', sec:'副屬和弦', dom:'加屬七推返主和弦', iiV:'相關 ii–V', dim:'經過減七', bor:'借用小調 IVm', sub:'重複樂句換和弦', };
+
+  // 色彩音候選（深淺 1 輕 / 2 中 / 3 濃），按調內功能揀
+  function extCands(e, nx, key, d){ const rel=mod(e.root-key.tonic,12), t=triOf(e.suf), k=rel+'|'+e.suf, i=Math.max(0,Math.min(2,d-1));
+    const T=key.mode==='minor'?{
+      '0|m':[['m7','madd9'],['madd9','m7','m9'],['m9','m11','madd9','m7']], '0|m7':[[],['m9'],['m9','m11']],
+      '2|dim':[['m7b5'],['m7b5'],['m7b5']], '3|':[['maj7','add9'],['maj7','add9'],['maj9','maj7','add9']],
+      '5|m':[['m7'],['m7','m9'],['m9','m11','m7']], '5|m7':[[],['m9'],['m9','m11']], '7|m':[['m7'],['m7'],['m7']],
+      '7|':[['7'],['7'],['7b9','7']], '7|7':[[],[],['7b9']], '8|':[['maj7','add9'],['maj7','add9'],['maj9','maj7','add9']], '8|maj7':[[],[],['maj9']],
+      '10|':[['add9'],['add9'],['add9','9']] }
+    :{ '0|':[['add9'],['add9','maj7','6'],['maj9','6/9','add9','maj7']], '0|maj7':[[],[],['maj9']], '0|add9':[[],[],['6/9','maj9']],
+      '5|':[['add9','maj7'],['maj7','add9','6'],['maj9','maj7','add9','6/9']], '5|maj7':[[],[],['maj9']], '5|add9':[[],['maj9'],['maj9']],
+      '2|m':[['m7'],['m7'],['m9','m11','m7']], '2|m7':[[],[],['m9','m11']], '4|m':[['m7'],['m7'],['m7']],
+      '7|':[['7'],['9','7'],['9','13','7']], '7|7':[[],['9'],['9','13']],
+      '9|m':[['m7'],['m9','m7'],['m9','m11','m7']], '9|m7':[[],['m9'],['m9','m11']], '11|dim':[['m7b5'],['m7b5'],['m7b5']] };
+    if(T[k]) return T[k][i];
+    // 調外大和弦，跟住去四度上（屬功能，例如 E → Am、D → G）→ 屬七
+    if(t==='' && nx && mod(nx.root-e.root,12)===5 && (e.suf===''||e.suf==='7')){ const minT=triOf(nx.suf)==='m';
+      return [[e.suf===''?'7':''].filter(Boolean), e.suf===''?['7']:['9'], minT?['7b9','7']:['9','13','7']][i].filter(s=>s!==e.suf); }
+    if(t==='m' && e.suf==='m') return [['m7'],['m7','m6'],['m7','m6']][i];   // 借用 / 調外小和弦
+    return []; }
+
+  function make(mel, o){ const key0=o.key, B=o.B, beat=o.beatQ||1, strongQ=o.strongQ||(B===4?[0,2]:[0]), strict=o.strict!==false;
+    const keyAt=o.keyAt||(()=>key0); const ms=mel.slice().sort((a,b)=>a.qs-b.qs);
+    const sounding=t=>{ let hit=null; for(const n of ms){ if(n.qs>t+EPS) break; if(n.qe>t+EPS) hit=n; } return hit; };
+    function must(q0,q1){ const s=new Set(); for(let b=Math.floor(q0/B+EPS); b*B<q1-EPS; b++) for(const sq of strongQ){ const t=b*B+sq; if(t>=q0-EPS && t<q1-EPS){ const n=sounding(t); if(n) s.add(mod(n.pitch,12)); } }
+      // 冇重拍嘅短和弦（例如第 4 拍插嘅副屬）：開頭嗰粒音都要係和弦音
+      if(!s.size){ const n=sounding(q0+EPS); if(n && n.qe-Math.max(n.qs,q0)>=beat*0.5-EPS) s.add(mod(n.pitch,12)); }
+      return [...s]; }
+    const over=(q0,q1)=>ms.filter(n=>n.qs<q1-EPS && n.qe>q0+EPS && Math.min(n.qe,q1)-Math.max(n.qs,q0)>=Math.min(0.25,beat/4)-EPS);
+    // c = {root, suf, bass}；old = 原本嘅和弦（用嚟計邊啲係新加嘅音）
+    function fits(c, q0, q1, old){ const P=pcs(c.root,c.suf), C=core(c.root,c.suf), key=keyAt(q0), sc=scaleOf(key);
+      const O=old?new Set(pcs(old.root,old.suf)):new Set(), fresh=P.filter(pc=>!O.has(pc)||!sc.has(pc));
+      for(const pc of must(q0,q1)) if(!(strict?C:P).includes(pc)) return false;
+      const mpc=[...new Set(over(q0,q1).map(n=>mod(n.pitch,12)))];
+      // 伴奏喺旋律下面：旋律高過新加嘅音半音（小九度 / 小二度，例如 Cmaj7 嘅 B 頂住旋律 C）一定撞；
+      // 新加嘅音高過旋律半音 = 大七度，係色彩（Fmaj7 頂 E 旋律）；但調外嘅音（例如 A7 嘅 C♯ 對住旋律 C）兩邊都唔得
+      for(const t of fresh){ if(mod(t-c.bass,12)===1 && t!==c.bass) return false;                      // 同低音撞小九度
+        for(const m of mpc){ if(m===t) continue; const d=mod(m-t,12); if(d===1 || (d===11 && !sc.has(t))) return false; } }
+      if(triOf(c.suf)==='sus'){ const th=[3,4].map(x=>mod(c.root+x,12)); if(mpc.some(m=>th.includes(m))) return false; }   // 掛四 / 掛二：旋律有三度就唔掛
+      for(const m of mpc) if(m!==c.bass && mod(m-c.bass,12)===1) return false;                          // 旋律喺低音上面半音（小九度）
+      return true; }
+    return {must, over, fits, keyAt, B, beat, strongQ, ms}; }
+
+  function run(evsIn, mel, o){
+    const X=make(mel,o), B=X.B, beat=X.beat, st=o.steps||{}, D=Math.max(1,Math.min(3,o.depth||2)), log=[], keyAt=X.keyAt;
+    let evs=evsIn.map(e=>({q0:e.q0, q1:e.q1, root:e.root, suf:e.suf, bass:e.bass??e.root, src:e.src, vo:e.vo, vx:e.vx})).filter(e=>e.q1>e.q0+EPS).sort((a,b)=>a.q0-b.q0);
+    const end=evs.length?evs[evs.length-1].q1:0, nb=Math.ceil(end/B-EPS);
+    const L=x=>({root:x.root,suf:x.suf,bass:x.bass});
+    const rel=(e)=>mod(e.root-keyAt(e.q0).tonic,12);
+    // 副歌（旋律最高嗰幾段）濃一級、其他照揀嘅深淺
+    const depthAt=(()=>{ if(!st.sect) return ()=>D; const G=nb>=24?8:4, groups=[];
+      for(let b=0;b<nb;b+=G){ const ns=X.ms.filter(n=>n.qs>=b*B-EPS && n.qs<(b+G)*B-EPS); if(!ns.length){ groups.push(null); continue; }
+        groups.push(ns.reduce((t,n)=>t+n.pitch*(n.qe-n.qs),0)/ns.reduce((t,n)=>t+(n.qe-n.qs),0)); }
+      const v=groups.filter(x=>x!=null).sort((a,b)=>a-b), cut=v.length>=3?v[Math.floor(v.length*0.6)]:Infinity;
+      return q=>{ const g=groups[Math.floor(q/B/G+EPS)]; return g!=null && g>=cut ? Math.min(3,D+1) : D; }; })();
+
+    /* ① 重複樂句換和弦（和弦重組）：第二次出現嘅同一句旋律，換做功能相近嘅代理和弦 */
+    if(st.sub && nb>=4){ const W=2, sig=[]; for(let b=0;b<nb;b++) sig.push(X.ms.filter(n=>n.qs>=b*B-EPS && n.qs<(b+1)*B-EPS).map(n=>n.pitch+'@'+(Math.round((n.qs-b*B)*8)/8)).join(','));
+      const winSig=b=>{ const s=sig.slice(b,b+W); return s.length===W && s.every(x=>x.split(',').length>=2)?s.join('|'):null; };
+      const harmSig=b=>evs.filter(e=>e.q0>=b*B-EPS && e.q0<(b+W)*B-EPS).map(e=>e.root+e.suf).join(',');
+      const seen=new Map(), done=new Set();
+      for(let b=0;b+W<=nb;b++){ const s=winSig(b); if(!s) continue; const first=seen.get(s);
+        if(first==null){ seen.set(s,b); continue; } if(b<first+W || done.has(b)) continue; if(harmSig(b)!==harmSig(first)) continue;
+        for(let k=0;k<W;k++) done.add(b+k);
+        const SUBM=keyAt(b*B).mode==='minor'?{'0|m':[[8,'maj7'],[3,'']], '5|m':[[2,'m7b5']], '8|':[[0,'m7'],[5,'m7']], '3|':[[0,'m7']]}
+          :{'0|':[[9,'m7'],[4,'m7'],[0,'',4]], '5|':[[2,'m7'],[5,'',9]], '9|m':[[5,'maj7'],[0,'',4]], '2|m':[[5,'']], '4|m':[[0,'',4]], '9|m7':[[5,'maj7']], '2|m7':[[5,'maj7']]};
+        let n=0; const inW=evs.filter(e=>e.q0>=b*B-EPS && e.q1<=(b+W)*B+EPS);
+        for(const e of inW){ if(n>=2) break; const k0=rel(e)+'|'+e.suf, opts=SUBM[k0]; if(!opts) continue; const key=keyAt(e.q0);
+          const idx=evs.indexOf(e), nx=evs[idx+1]; if(!nx) continue;                                   // 最尾粒唔換
+          if(rel(e)===0 && nx && mod(nx.root-e.root,12)!==0 && idx>0 && mod(evs[idx-1].root-e.root,12)===7) continue;   // V → I 終止唔換
+          for(const [r,suf,bsRel] of opts){ const c={root:mod(key.tonic+r,12), suf, bass:mod(key.tonic+(bsRel??r),12)};
+            if(X.fits(c,e.q0,e.q1,e)){ log.push({q0:e.q0, from:[L(e)], to:[c], why:'sub', note:`第 ${first+1} 小節嗰句旋律喺度重複，第二次換做代理和弦`}); Object.assign(e,c,{src:'beau'}); n++; break; } } } } }
+
+    /* ② 插和弦：副屬 / 屬七、經過減七、借用 IVm（都係喺前一粒和弦最尾嗰一兩拍插）*/
+    if(st.sec || st.dim || st.bor){ const out=[]; let lastIns=-1e9;
+      for(let i=0;i<evs.length;i++){ const p=evs[i], t=evs[i+1]; out.push(p); if(!t) continue;
+        const pd=p.q1-p.q0; if(pd<2*beat-EPS) continue; const key=keyAt(t.q0), minor=key.mode==='minor', rt=mod(t.root-key.tonic,12), rp=mod(p.root-key.tonic,12), tq=triOf(t.suf), d=depthAt(t.q0);
+        const len=pd>=4*beat-EPS?2*beat:beat, q=p.q1-len; if(q<=p.q0+EPS) continue;
+        const tries=[];
+        if(st.bor && !minor && rp===5 && triOf(p.suf)==='' && rt===0) tries.push({c:{root:p.root, suf:'m6', bass:p.bass}, why:'bor', q:p.q0+Math.round(pd/2/beat)*beat});
+        const isDomOfT=mod(p.root-t.root,12)===7 && isDomSuf(p.suf);
+        if(st.sec && !isDomOfT && q-lastIns>=2*B-EPS && tq!=='dim' && tq!=='sus'){
+          const diaT=minor?{0:'m',3:'',5:'m',7:'',8:'',10:''}:{0:'',2:'m',4:'m',5:'',7:'',9:'m'};
+          if(diaT[rt]!=null && diaT[rt]===tq && !(minor && rt===10)){ const why=rt===0?'dom':'sec', r=mod(t.root+7,12);
+            if(d>=3 && len>=2*beat-EPS) tries.push({iiV:true, c:{root:mod(t.root+2,12), suf:tq==='m'?'m7b5':'m7', bass:mod(t.root+2,12)}, c2:{root:r, suf:tq==='m'?'7b9':'7', bass:r}, why:'iiV', q});
+            for(const suf of (tq==='m'&&d>=3?['7b9','7']:['7'])) tries.push({c:{root:r, suf, bass:r}, why, q}); } }
+        if(st.dim && mod(t.root-p.root,12)===2 && tq!=='dim') tries.push({c:{root:mod(t.root-1,12), suf:'dim7', bass:mod(t.root-1,12)}, why:'dim', q:p.q1-beat});
+        for(const T of tries){ const q0=T.q; if(q0<=p.q0+EPS || q0>=p.q1-EPS) continue;
+          if(T.iiV){ const mid=q0+(p.q1-q0)/2; if(!X.fits(T.c,q0,mid,null) || !X.fits(T.c2,mid,p.q1,null)) continue;
+            const a={...T.c, q0, q1:mid, src:'beau', ins:true}, b2={...T.c2, q0:mid, q1:p.q1, src:'beau', ins:true}; log.push({q0, from:[L(p)], to:[L(p),T.c,T.c2], why:'iiV', tgt:L(t)});
+            p.q1=q0; out.push(a,b2); lastIns=q0; break; }
+          if(!X.fits(T.c,q0,p.q1,null)) continue;
+          const n={...T.c, q0, q1:p.q1, src:'beau', ins:true}; log.push({q0, from:[L(p)], to:[L(p),T.c], why:T.why, tgt:L(t)}); p.q1=q0; out.push(n); if(T.why!=='bor') lastIns=q0; break; } }
+      evs=out.filter(e=>e.q1>e.q0+EPS); }
+
+    /* ③ 色彩音：7 / 9 / 11（新和弦一定包含晒原本啲音，只係加；撞旋律就唔加）*/
+    if(st.ext!==false){ for(let i=0;i<evs.length;i++){ const e=evs[i], nx=evs[i+1]; const key=keyAt(e.q0), d=depthAt(e.q0);
+        if(e.suf==='dim7'||triOf(e.suf)==='aug'||triOf(e.suf)==='sus') continue; const old=pcs(e.root,e.suf);
+        for(const suf of extCands(e,nx,key,d)){ if(suf===e.suf || CPX(suf)<=CPX(e.suf)) continue; const P=pcs(e.root,suf); if(!old.every(pc=>P.includes(pc))) continue;
+          const c={root:e.root, suf, bass:e.bass}; if(!X.fits(c,e.q0,e.q1,e)) continue;
+          log.push({q0:e.q0, from:[L(e)], to:[c], why:'ext'}); e.suf=suf; if(e.src!=='beau') e.src='beau'; break; } } }
+
+    /* ④ sus4 → 解決：屬和弦（去四度上）夠兩拍，前半掛四、後半解決 */
+    if(st.sus){ const out=[]; for(let i=0;i<evs.length;i++){ const e=evs[i], nx=evs[i+1]; out.push(e);
+        if(!nx || e.ins || mod(nx.root-e.root,12)!==5 || !['','7','9','13'].includes(e.suf)) continue; const len=e.q1-e.q0; if(len<2*beat-EPS) continue;
+        if(mod(e.root-keyAt(e.q0).tonic,12)!==7 && len<4*beat-EPS) continue;          // 主要係 V → I（Gsus4 → G → C）；副屬要成小節先掛
+        const mid=e.q0+Math.max(beat, Math.round(len/2/beat)*beat); if(mid>=e.q1-EPS) continue;
+        const c={root:e.root, suf:e.suf===''?'sus4':'7sus4', bass:e.bass}; if(!X.fits(c,e.q0,mid,e)) continue;
+        const a={...e, ...c, q1:mid, src:'beau'}; log.push({q0:e.q0, from:[L(e)], to:[c,L(e)], why:'sus'}); out[out.length-1]=a; out.push({...e, q0:mid, src:'beau'}); }
+      evs=out; }
+
+    /* ⑤ 低音級進：揀轉位 / slash 令低音行一步步（C – G/B – Am – Am/G – F…）；樂句頭、終止式、最頭最尾用原位 */
+    if(st.bass && evs.length>=2){ const opt=evs.map((e,i)=>{ const r=e.root, I0=pcs(r,e.suf), tq=triOf(e.suf), list=[{b:r, c:0, kind:'root'}];
+        const has=iv=>I0.includes(mod(r+iv,12));
+        if(e.bass!==r) return [{b:e.bass, c:0, kind:'keep'}];                         // 本身已經係 slash（例如 F/G）：係刻意嘅，唔郁
+        const th=has(4)?4:has(3)?3:null; if(th!=null && tq!=='dim') list.push({b:mod(r+th,12), c:tq==='m'?0.45:0.35, kind:'3rd'});
+        if(has(7)) for(const dir of [1,-1]) list.push({b:mod(r+7,12), c:0.7, kind:'pass', dir});   // 經過 6/4：前後同一個方向行一步
+        const sv=has(10)?10:has(11)?11:null, pb=sv!=null?mod(r+sv,12):(tq===''&&!isDomSuf(e.suf))?mod(r-1,12):tq==='m'?mod(r-2,12):null;
+        // 長和弦（成小節）：前半原位、後半低音落一級（Am – Am/G、C – C/B）；短和弦：成粒用經過低音
+        if(pb!=null){ if(e.q1-e.q0>=4*beat-EPS && e.bass===r) list.push({b:r, out:pb, c:0.3, kind:'split', dir:-1}); else if(sv!=null) list.push({b:pb, c:0.4, kind:'pass', dir:-1}); }   // 7 度喺低音一定要向下解決
+        // 同旋律撞小九度嘅低音唔要；3 度低音又啱啱係重拍旋律音（雙三度）扣分
+        const mpc=X.over(e.q0,e.q1).map(n=>mod(n.pitch,12)), mu=X.must(e.q0,e.q1);
+        const ok=list.filter(o=>!mpc.some(m=>m!==o.b && mod(m-o.b,12)===1)).map(o=>({...o, c:o.c+(o.kind==='3rd'&&mu.includes(o.b)?0.3:0)}));
+        const key=keyAt(e.q0), pv=evs[i-1], nx=evs[i+1];
+        const cad=(nx && mod(nx.root-key.tonic,12)===0 && mod(e.root-nx.root,12)===7 && (i+2>=evs.length || Math.abs(mod(nx.q0,B))<EPS && nx.q1-nx.q0>=B-EPS)) || (pv && mod(e.root-key.tonic,12)===0 && mod(pv.root-e.root,12)===7 && Math.abs(mod(e.q0,B))<EPS && (e.q1-e.q0>=B-EPS || i===evs.length-1));
+        const phraseHead=Math.abs(mod(e.q0,4*B))<EPS;
+        for(const o of ok) if(o.kind!=='root' && o.kind!=='keep'){ if(i===0||i===evs.length-1||cad) o.c+=3; else if(phraseHead) o.c+=0.6; }
+        return ok.length?ok:[list[0]]; });
+      const stepOk=(from,to,dir)=>{ const u=mod(to-from,12); return dir>0?(u===1||u===2):(u===10||u===11); };
+      const tc=(a,b,ra,rb)=>{ const ab=a.out??a.b, d=pcDist(ab,b.b); let c=d===0?(ra===rb?0:0.15):d<=2?0:d<=4?0.45:d===5?0.55:0.9;
+        if(a.dir && !stepOk(ab,b.b,a.dir)) c+=50; if(b.kind==='pass' && !stepOk(ab,b.b,b.dir)) c+=50; return c; };   // 經過低音：入同出都要向同一個方向行一步
+      let V=opt[0].map(o=>({s:o.c, bk:null}));
+      const BK=[V];
+      for(let i=1;i<evs.length;i++){ const nv=opt[i].map(o=>{ let best=Infinity, bk=0; opt[i-1].forEach((p,j)=>{ const s=V[j].s+tc(p,o,evs[i-1].root,evs[i].root); if(s<best){ best=s; bk=j; } }); return {s:best+o.c, bk}; }); V=nv; BK.push(V); }
+      let j=V.reduce((bi,x,k)=>x.s<V[bi].s?k:bi,0); const pick=[]; for(let i=evs.length-1;i>=0;i--){ pick[i]=opt[i][j]; j=BK[i][j].bk; }
+      // 經過低音要真係前後都一步（DP 已經保證）；改咗嘅寫入 log
+      const out=[]; evs.forEach((e,i)=>{ const o=pick[i]; out.push(e);
+        if(o.kind==='split'){ const mid=e.q0+Math.round((e.q1-e.q0)/2/beat)*beat, c={root:e.root, suf:e.suf, bass:o.out};
+          if(!X.fits(c,mid,e.q1,e)) return; out.push({...e, ...c, q0:mid, src:'beau'}); log.push({q0:e.q0, from:[L(e)], to:[L(e),c], why:'bass'}); e.q1=mid; return; }
+        if(o.b===e.bass) return; const c={root:e.root, suf:e.suf, bass:o.b};
+        if(!X.fits(c,e.q0,e.q1,e)) return; log.push({q0:e.q0, from:[L(e)], to:[c], why:'bass'}); e.bass=o.b; if(e.src!=='beau') e.src='beau'; }); evs=out; }
+
+    // 相鄰一樣嘅和弦合返做一粒
+    const merged=[]; for(const e of evs){ const l=merged[merged.length-1]; if(l && l.root===e.root && l.suf===e.suf && l.bass===e.bass && Math.abs(l.q1-e.q0)<EPS) l.q1=e.q1; else merged.push(e); }
+    const stats={}; for(const g of log) stats[g.why]=(stats[g.why]||0)+1;
+    return {evs:merged, log:log.sort((a,b)=>a.q0-b.q0), stats}; }
+  return {run, extCands, make, WHY, triOf};
+})();
+if(typeof module!=='undefined' && module.exports){ module.exports.Beau=Beau; }
+/* ==BEAU END== */
 </script>
 
 <script>
@@ -6076,10 +6299,16 @@ const ChordUI=(()=>{
   function patAt(bar, gp){ let p=gp; for(const g of CH.segs) if(bar+1>=g.a && bar+1<=g.b) p=g.pat; return p; }
   function accNotes(gp){ const evs=events(), pats=new Set([gp, ...CH.segs.map(g=>g.pat)]); const out=[];
     if(gp==='cello' && !CH.segs.length) return Harm.accomp(evs, I.notes, {B:I.B, beatQ:I.beatQ, pattern:'cello', key:CH.key});
-    for(const pat of pats){ if(!pat || pat==='none') continue; const ns=Harm.accomp(evs, I.notes, {B:I.B, beatQ:I.beatQ, pattern:pat, key:CH.key, profile:libProfile()});
+    const evA=$('chAnt').checked?Harm.anticipate(evs, I.B, I.beatQ/2):evs, color=$('chColor').checked;
+    for(const pat of pats){ if(!pat || pat==='none') continue; const ns=Harm.accomp(evA, I.notes, {B:I.B, beatQ:I.beatQ, pattern:pat, key:CH.key, profile:libProfile(), color});
       for(const n of ns){ const bar=Math.floor(n.qs/I.B+1e-9); if(patAt(bar,gp)!==pat) continue; let qe=n.qe;
         for(let b=bar+1; b*I.B<qe-1e-6; b++) if(patAt(b,gp)!==pat){ qe=b*I.B; break; } out.push({...n, qe}); } }
-    return applyVx(voiceAcc(out, evs), evs, gp); }
+    const res=applyVx(voiceAcc(out, evs), evs, gp);
+    if($('chFill').checked && gp!=='cello'){ const top=new Map(); for(const n of res){ const k=n.qs.toFixed(2); top.set(k, Math.max(top.get(k)??0, n.pitch)); }
+      for(const f of Harm.fills(evs, I.notes, {B:I.B, beatQ:I.beatQ})){ // 小句要喺伴奏上面：同一刻嘅伴奏音高過佢就唔加
+        const clash=res.some(n=>n.qs<f.qe-1e-6 && n.qe>f.qs+1e-6 && (n.pitch>=f.pitch || Math.abs(n.pitch-f.pitch)%12===1 || Math.abs(n.pitch-f.pitch)%12===11)); if(!clash) res.push(f); }
+      res.sort((a,b)=>a.qs-b.qs||a.pitch-b.pitch); }
+    return res; }
   // 喺琴鍵自己砌嘅按法（pt.vx）：柱式 / 長音 / 琶音和弦就用返你按嘅音
   function applyVx(ns, evs, gp){ let out=ns;
     for(const e of evs){ const pt=CH.pts.find(p=>Math.abs(p.q-e.q0)<1e-6); if(!pt || !pt.vx || !pt.vx.length) continue; const pat=patAt(Math.floor(e.q0/I.B+1e-9), gp);
@@ -6111,11 +6340,54 @@ const ChordUI=(()=>{
     if(nb>1){ const t=CH.segs[CH.segs.length-1]; if(t && t.b===nb){ if(t.a<nb) t.b=nb-1; else CH.segs.pop(); } CH.segs.push({a:nb,b:nb,pat:'hold'}); }
     segRender(); $('chMsg').textContent=`全首用「${Harm.PATTERNS[lyr].zh}」；旋律最高嗰 ${CH.segs.length-1} 段（多數係副歌）用「${Harm.PATTERNS[hot].zh}」；最尾一小節長音。可以逐段改。`; }
   function hl(q){ document.querySelectorAll('.chbar.play').forEach(x=>x.classList.remove('play')); if(q<0){ if(!CH.kbEdit && kb){ kb.marks=new Map(); kb.draw(); } return; } kbFollow(q); const b=Math.floor(q/I.B); const el=$('chGrid').children[b]; if(el) el.classList.add('play'); }
-  function playSpan(a, b){ const pat=$('chPat').value==='none'&&!CH.segs.length?'hold':$('chPat').value;
+  function spanNotes(a, b){ const pat=$('chPat').value==='none'&&!CH.segs.length?'hold':$('chPat').value;
     const ns=I.notes.filter(n=>n.qe>a && n.qs<b).map(n=>({pitch:n.pitch, qs:Math.max(a,n.qs), qe:Math.min(b,n.qe), vel:90}))
       .concat(accNotes(pat).filter(n=>n.qe>a && n.qs<b).map(n=>({...n, qs:Math.max(a,n.qs), qe:Math.min(b,n.qe)})));
     { const bpm=+$('bpm').value||I.bpm, spq=60/bpm; rollMark(ns.filter(n=>n.orn==='arpeggio')).forEach((off,n)=>{ n.qs+=off/spq; }); }
-    if(ns.length){ CH.playNs=ns; Preview.play(ns, +$('bpm').value||I.bpm, hl); } }
+    return ns; }
+  function playSpan(a, b){ const ns=spanNotes(a,b); if(ns.length){ CH.playNs=ns; Preview.play(ns, +$('bpm').value||I.bpm, hl); } }
+
+  /* ---- ✨ 美化和弦：Beau.run 一步步加靚；可以前後對比、返去美化前 ---- */
+  const ptsSig=pts=>pts.map(p=>p.q.toFixed(3)+':'+p.root+p.suf+'/'+p.bass).sort().join(' ');
+  function bzOpts(){ return {key:CH.key, keyAt, B:I.B, beatQ:I.beatQ, strongQ:I.strongQ, strict:$('chStrict').checked, depth:+$('bzDepth').value,
+    steps:{ext:$('bzExt').checked, sus:$('bzSus').checked, bass:$('bzBass').checked, sec:$('bzSec').checked, dim:$('bzDim').checked, bor:$('bzBor').checked, sub:$('bzSub').checked, sect:$('bzSect').checked}}; }
+  const SUF_ZH={add9:'加九 add9', madd9:'小三加九', maj7:'大七 maj7', m7:'小七 m7', '7':'屬七 7', '9':'屬九 9', '13':'13', maj9:'大九 maj9', m9:'小九 m9', m11:'小十一 m11', '6':'六 6', '6/9':'六九 6/9', m6:'小六 m6', m7b5:'半減七', '7b9':'7♭9'};
+  function bzWhy(g){ const nm2=c=>cName({...c, q0:g.q0}), tg=g.tgt?nm2(g.tgt):'';
+    switch(g.why){ case 'ext': return '加色彩音（'+(SUF_ZH[g.to[0].suf]||g.to[0].suf)+'）';
+      case 'sus': return '掛四再解決（前半 sus4、後半還原）'; case 'bass': return g.to.length>1?'低音落一級（前半原位、後半 slash）':'轉位：低音一步步行';
+      case 'sec': return '副屬和弦：帶去 '+tg; case 'dom': return '加屬七推返主和弦 '+tg; case 'iiV': return '相關 ii–V：帶去 '+tg;
+      case 'dim': return '經過減七：低音半音行去 '+tg; case 'bor': return '借用小調 IVm（IV → iv → I）'; case 'sub': return g.note||'重複樂句換和弦'; }
+    return g.why; }
+  function beautify(){ prep(); if(!CH.pts.length){ $('bzMsg').textContent='未有和弦：先撳「🎼 按樂理自動配」、「AI 配」或者逐格揀，再美化。'; return; }
+    // 撳完美化之後冇改過 → 由美化前嗰版重新做（換深淺 / 選項再撳，唔會越疊越多）
+    const base=(CH.bz && CH.bz.after===ptsSig(CH.pts))?CH.bz.before:CH.pts.map(p=>({...p}));
+    const res=Beau.run(events(base), I.notes, bzOpts());
+    const nb={}; for(const g of res.log) nb[g.why]=(nb[g.why]||0)+1;
+    if(!res.log.length){ CH.pts=base.map(p=>({...p})); render(); $('bzMsg').textContent='呢版已經好靚，冇得再加（可以試「濃」或者剔多啲選項）。'; $('bzLog').hidden=true; return; }
+    const old=new Map(base.map(p=>[p.q.toFixed(3),p]));
+    CH.pts=res.evs.map(e=>{ const o0=old.get(e.q0.toFixed(3)), same=o0 && o0.root===e.root && o0.suf===e.suf && o0.bass===e.bass;
+      return same?{...o0}:{q:e.q0, root:e.root, suf:e.suf, bass:e.bass, src:'beau', vo:o0&&o0.root===e.root?o0.vo:undefined}; });
+    CH.bz={before:base.map(p=>({...p})), after:ptsSig(CH.pts), log:res.log};
+    $('chColor').checked=true; CH.sel=null; $('chPop').hidden=true; render();
+    const Z={ext:'色彩音',sus:'sus4',bass:'低音',sec:'副屬',dom:'屬七',iiV:'ii–V',dim:'經過減七',bor:'借用 IVm',sub:'換和弦'};
+    $('bzMsg').textContent=`美化咗 ${res.log.length} 處（${Object.entries(nb).map(([k,v])=>Z[k]+' '+v).join('、')}）。粉紅字 = 改咗嘅；「伴奏彈埋色彩音」已經開咗，試聽先聽到 9 / 11。`;
+    bzLogRender(); }
+  // 每粒原本嘅和弦一行：原本 → 美化後（嗰段時間入面嘅和弦），後面寫用咗咩手法
+  function bzLogRender(){ const box=$('bzLog'); if(!CH.bz||!CH.bz.log.length){ box.hidden=true; return; } box.hidden=false;
+    const A=events(CH.bz.before), Bv=events(), sig=e=>e.root+'|'+e.suf+'|'+e.bass, rows=[];
+    for(const e of A){ const fin=Bv.filter(x=>x.q0<e.q1-1e-6 && x.q1>e.q0+1e-6), same=fin.length===1 && sig(fin[0])===sig(e); if(same) continue;
+      const why=[...new Set(CH.bz.log.filter(g=>g.q0>=e.q0-1e-6 && g.q0<e.q1-1e-6).map(bzWhy))];
+      rows.push({e, fin, why}); }
+    box.innerHTML=`<div class="muted">改咗 ${rows.length} 粒（撳小節號碼試聽嗰兩小節）：</div>`+rows.map(({e,fin,why})=>{ const bar=Math.floor(e.q0/I.B+1e-9), beat=+((e.q0-bar*I.B)/I.beatQ+1).toFixed(2);
+      return `<div><span class="go" data-b="${bar}">第 ${bar+1} 小節${beat!==1?'第 '+beat+' 拍':''}</span>：${esc(cName(e))} → <b>${fin.map(x=>esc(cName(x))).join(' → ')}</b>　<span class="muted">${esc(why.join('；'))}</span></div>`; }).join('');
+    box.querySelectorAll('.go').forEach(el=>el.onclick=()=>{ const b=+el.dataset.b; $('chFrom').value=b+1; playSpan(b*I.B, Math.min(endQ(), (b+2)*I.B)); }); }
+  function bzAB(){ if(!CH.bz){ $('bzMsg').textContent='未美化：先撳「✨ 美化」。'; return; }
+    const a=Math.max(0,Math.min(I.nb-1,(+$('chFrom').value||1)-1))*I.B, b=Math.min(endQ(), a+4*I.B), gap=I.B, keep=CH.pts;
+    let A, Bn; try{ CH.pts=CH.bz.before; A=spanNotes(a,b); } finally{ CH.pts=keep; } Bn=spanNotes(a,b).map(n=>({...n, qs:n.qs+(b-a)+gap, qe:n.qe+(b-a)+gap}));
+    const ns=A.concat(Bn); if(!ns.length) return; CH.playNs=null;
+    $('bzMsg').textContent=`▶ 第 ${a/I.B+1}–${b/I.B} 小節：先播「美化前」，停一停，再播「美化後」。`;
+    Preview.play(ns, +$('bpm').value||I.bpm, q=>{ if(q<0){ hl(-1); return; } hl(q>=b+gap-1e-6?q-(b-a)-gap:q); }); }
+  function bzBack(){ if(!CH.bz){ $('bzMsg').textContent='未美化過。'; return; } Preview.stop(); CH.pts=CH.bz.before.map(p=>({...p})); CH.bz=null; render(); bzLogRender(); $('bzMsg').textContent='返咗去美化前嘅和弦。'; }
   // 同一刻開始嘅伴奏和弦（2 粒或以上）：由低至高每粒遲 35 毫秒
   function rollMark(ns){ const m=new Map(), g=new Map(); for(const n of ns){ const k=n.qs.toFixed(3); if(!g.has(k)) g.set(k,[]); g.get(k).push(n); }
     for(const v of g.values()) if(v.length>=2) v.sort((a,b)=>a.pitch-b.pitch).forEach((n,i)=>m.set(n,i*0.035)); return m; }
@@ -6167,7 +6439,7 @@ const ChordUI=(()=>{
       $('chPat').innerHTML=Object.entries(Harm.PATTERNS).map(([id,p])=>`<option value="${id}">${p.zh}</option>`).join('');
     }
     const sig=I.notes.length+'|'+I.B+'|'+(I.notes[0]&&I.notes[0].pitch)+'|'+S.title;
-    if(CH.sig!==sig){ CH.sig=sig; CH.pts=[]; CH.sel=null; CH.backup=null; CH.vers=null; CH.keepUser=null; CH.verSel=0; CH.segs=[]; $('chFrom').value=1; renderVers();
+    if(CH.sig!==sig){ CH.sig=sig; CH.pts=[]; CH.sel=null; CH.backup=null; CH.vers=null; CH.bz=null; $('bzLog').hidden=true; $('bzMsg').textContent=''; CH.keepUser=null; CH.verSel=0; CH.segs=[]; $('chFrom').value=1; renderVers();
       // 用返譜上面已經有嘅和弦（例如之前配過）
       $('chKey').value=I.key.tonic+':'+I.key.mode; $('chRate').value=I.B===4&&!I.compound?'half':'bar'; $('chPreset').value='triad'; $('chStrict').checked=true; $('chPat').value='rolled';
       const hasLH=(S.tracks||[]).some(t=>(t.role==='piano'||t.role==='both') && t.notes.some(n=>n.hand==='l'));
@@ -6185,6 +6457,7 @@ const ChordUI=(()=>{
   $('chClose').onclick=()=>{ Preview.stop(); $('chDlg').hidden=true; $('chPop').hidden=true; };
   $('chAuto').onclick=()=>{ CH.seed=11; auto(); };
   $('chAIGo').onclick=aiFill;
+  $('bzGo').onclick=beautify; $('bzAB').onclick=bzAB; $('bzBack').onclick=bzBack;
   $('chClear').onclick=()=>{ CH.pts=[]; CH.vers=null; CH.keepUser=null; $('chPop').hidden=true; renderVers(); render(); };
   for(const id of ['chKey','chPreset','chStrict']) $(id).onchange=()=>{ prep(); render(); };
   $('chRate').onchange=()=>{ prep(); render(); };
