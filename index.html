@@ -1391,14 +1391,14 @@ const Core = (() => {
     const qs=(t,g)=>Math.max(0, Math.round(an.qOf(t)*4/g)*g);
     // 量化：起音貼近八分音符位就歸去八分音符位；長音嘅收尾歸去八分 / 四分音符位，減少碎音同連音線
     const quant=(n,g)=>{
-      const ex=exactQ(an,n,g); if(ex) return {pitch:n.pitch, s:ex[0], e:ex[1], vel:n.velocity, rd:n.end-n.start, t0:n.start, hand:n.hand, art:n.art, slur:n.slur, dyn0:n.dyn0, v2:n.v2, ly:n.ly, orn:n.orn, sp:n.sp};
+      const ex=exactQ(an,n,g); if(ex) return {pitch:n.pitch, s:ex[0], e:ex[1], vel:n.velocity, rd:n.end-n.start, t0:n.start, hand:n.hand, art:n.art, slur:n.slur, dyn0:n.dyn0, v2:n.v2, ly:n.ly, orn:n.orn, sp:n.sp, hpS:n.hpS, hpE:n.hpE};
       const qs4=Math.max(0,an.qOf(n.start)*4), qe4=Math.max(0,an.qOf(n.end)*4);
       let s=Math.round(qs4/g)*g;
       if(g===1){ const ev=2*Math.round(qs4/2); if(Math.abs(qs4-ev)<=0.6) s=ev; }
       let e=Math.round(qe4/g)*g;
       if(e-s>=3){ const e2=2*Math.round(qe4/2); if(e2>s) e=e2; }
       if(e-s>=6){ const e4=4*Math.round(qe4/4); if(e4>s && Math.abs(qe4-e4)<=1.2) e=e4; }
-      if(e<=s) e=s+g; return {pitch:n.pitch, s, e, vel:n.velocity, rd:n.end-n.start, t0:n.start, hand:n.hand, art:n.art, slur:n.slur, dyn0:n.dyn0, ly:n.ly, orn:n.orn, sp:n.sp}; };
+      if(e<=s) e=s+g; return {pitch:n.pitch, s, e, vel:n.velocity, rd:n.end-n.start, t0:n.start, hand:n.hand, art:n.art, slur:n.slur, dyn0:n.dyn0, ly:n.ly, orn:n.orn, sp:n.sp, hpS:n.hpS, hpE:n.hpE}; };
     const fine=raw.map(n=>quant(n,1));
     let totalSteps=Math.max(0,Math.ceil((opts.minQ||0)*4)); for(const n of fine) if(n.e>totalSteps) totalSteps=n.e;
     const totalBars=Math.max(1, Math.ceil(totalSteps/barSteps));
@@ -1542,11 +1542,11 @@ const Core = (() => {
   function arrangePart(raw, an, level, totalBars, B, program=-1){
     const L=LEVELS[level], barSteps=B*4, cap=totalBars*barSteps;
     const artOf=n=>n.art?{stacc:!!n.art.stacc||undefined, accent:!!n.art.accent||undefined, orn:n.orn}:(n.orn?{orn:n.orn}:{});   // 匯入樂譜嘅跳音、重音、裝飾音都保留
-    const quant0=n=>{ const ex=exactQ(an,n,L.grid); if(ex) return {pitch:n.pitch, s:ex[0], e:Math.min(ex[1],cap), vel:n.velocity, sp:n.sp};
+    const quant0=n=>{ const ex=exactQ(an,n,L.grid); if(ex) return {pitch:n.pitch, s:ex[0], e:Math.min(ex[1],cap), vel:n.velocity, sp:n.sp, hpS:n.hpS, hpE:n.hpE};
       const qs4=Math.max(0,an.qOf(n.start)*4), qe4=Math.max(0,an.qOf(n.end)*4);
       let s=Math.round(qs4/L.grid)*L.grid; if(L.grid===1){ const ev=2*Math.round(qs4/2); if(Math.abs(qs4-ev)<=0.6) s=ev; }
       let e=Math.round(qe4/L.grid)*L.grid; if(e-s>=3){ const e2=2*Math.round(qe4/2); if(e2>s) e=e2; }
-      if(e<=s) e=s+L.grid; return {pitch:n.pitch, s, e:Math.min(e,cap), vel:n.velocity, sp:n.sp}; };
+      if(e<=s) e=s+L.grid; return {pitch:n.pitch, s, e:Math.min(e,cap), vel:n.velocity, sp:n.sp, hpS:n.hpS, hpE:n.hpE}; };
     const quant=n=>Object.assign(quant0(n), artOf(n));
     let ns=raw.filter(n=>n.velocity>=L.minVel && (n.end-n.start)>=L.minDur).map(quant).filter(n=>n.s<cap);
     const med=median(ns.map(n=>n.pitch));
@@ -1868,13 +1868,18 @@ const Core = (() => {
       if(c.bass!=null){ const b=c.bs||spell(c.bass,f); x+=`<bass><bass-step>${b.step}</bass-step>${b.alter?`<bass-alter>${b.alter}</bass-alter>`:''}</bass>`; } return x+'</harmony>'; };
     const show={...SHOW_DEFAULT,...(o.show||{})};
     const slurA=new Set((arr.slurs||[]).map(x=>x.a)), slurB=new Set((arr.slurs||[]).map(x=>x.b));
-    const dir=(inner,staff,place)=>`<direction placement="${place}"><direction-type>${inner}</direction-type><staff>${staff}</staff></direction>`;
+    const dir=(inner,staff,place)=>`<direction placement="${place}"><direction-type>${inner}</direction-type>${staff?`<staff>${staff}</staff>`:''}</direction>`;
+    // 漸強 / 漸弱（wedge）：開始嗰粒音前面寫 crescendo / diminuendo，最後嗰粒音前面寫 stop
+    const hpA=new Map((arr.hairpins||[]).map(x=>[x.a,x.t])), hpB=new Map((arr.hairpins||[]).map(x=>[x.b,x.t]));
+    const wedge=(p,staff)=>{ if(p.rest || p.tiedFrom) return ''; const ns=p.notes||[]; let w='';
+      if(ns.some(n=>hpB.has(n.id))) w+=dir('<wedge type="stop"/>',staff,'below');
+      const a=ns.find(n=>hpA.has(n.id)); if(a) w+=dir(`<wedge type="${hpA.get(a.id)==='>'?'diminuendo':'crescendo'}"/>`,staff,'below'); return w; };
     // divisions = 24（一粒四分音符 = 24），三連音同三十二分音符先可以用整數表示；1 格十六分音符 = 6
     const DV=n=>Math.round(n*6);
     const tm=p=>p.tup&&p.tup.p>1?`<time-modification><actual-notes>${p.tup.p}</actual-notes><normal-notes>${p.tup.q}</normal-notes></time-modification>`:'';
     const tupN=p=>p.tup&&p.tup.p>1?(p.tupN?'<tuplet type="start" bracket="yes"/>':'')+(p.tupEnd?'<tuplet type="stop"/>':''):'';
     const piece=(p,voice,staff,bar,sub)=>{
-      const [type,dot]=TYPE[p.nd??p.d]||['16th',0]; const mk=sub?{}:pieceMarks(p,bar,arr,show,staff===1); let pre='';
+      const [type,dot]=TYPE[p.nd??p.d]||['16th',0]; const mk=sub?{}:pieceMarks(p,bar,arr,show,staff===1); let pre=sub?'':wedge(p,staff);
       if(mk.dyn) pre+=dir(`<dynamics><${mk.dyn}/></dynamics>`,staff,'below');
       if(mk.pedUp) pre+=dir('<pedal type="stop" line="no"/>',staff,'below');
       if(mk.pedDown) pre+=dir('<pedal type="start" line="no"/>',staff,'below');
@@ -1902,13 +1907,17 @@ const Core = (() => {
     const timeEl=()=>arr.meter?`<time><beats>${arr.meter.beats}</beats><beat-type>${arr.meter.beatType}</beat-type></time>`:`<time><beats>${arr.B}</beats><beat-type>4</beat-type></time>`;
     const parts=(arr.parts||[]).filter(p=>!p.drum);   // 鼓唔寫入 MusicXML；「只播放」嘅樂器都寫入（MuseScore 開到完整總譜）
     const noPianoX=parts.length>0 && !arr.rh.length && !arr.lh.length && !arr.showPiano;   // 冇鋼琴（例如只有大提琴）就唔寫空白鋼琴譜
-    const plist=parts.map((pt,i)=>`<score-part id="X${i}"><part-name>${esc(pt.label)}</part-name><score-instrument id="X${i}-I1"><instrument-name>${esc(pt.label)}</instrument-name></score-instrument><midi-instrument id="X${i}-I1"><midi-channel>${i+2>=10?i+3:i+2}</midi-channel><midi-program>${(pt.program||0)+1}</midi-program></midi-instrument></score-part>`).join('');
-    let x=`<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">\n<score-partwise version="3.1"><work><work-title>${esc(o.title||'未命名')}</work-title></work><identification><encoding><software>Music Editor</software></encoding></identification><part-list>${plist}${noPianoX?'':'<score-part id="P1"><part-name>Piano</part-name><score-instrument id="P1-I1"><instrument-name>Acoustic Grand Piano</instrument-name></score-instrument><midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>1</midi-program></midi-instrument></score-part>'}</part-list>\n`;
+    // 音量：MusicXML 標準 <volume>（0–100，MuseScore 讀得）：最大聲嗰種 = 100，其他按 dB 比例
+    const pDb=arr.pianoVol??0, maxDb=Math.max(noPianoX?-99:pDb, ...parts.map(p=>p.vol??-6)), volPct=db=>Math.max(0,Math.min(100,Math.round(100*Math.pow(10,(db-maxDb)/20))));
+    // 呢個 app 自己嘅設定（Swing、音量、♯/♭、播邊啲、PDF 印邊啲…）：寫喺 <miscellaneous>，其他軟件會略過，匯返入嚟就全部還原
+    const ME={app:'music-editor', v:1, swing:arr.swing||0, pianoVol:pDb, accPref:arr.accPref||'auto', parts:parts.map((p,i)=>({id:'X'+i, label:p.label, inst:p.inst||null, vol:p.vol??-6, hidden:!!p.hidden})), ...(o.appSettings||{})};
+    const plist=parts.map((pt,i)=>`<score-part id="X${i}"><part-name>${esc(pt.label)}</part-name><score-instrument id="X${i}-I1"><instrument-name>${esc(pt.label)}</instrument-name></score-instrument><midi-instrument id="X${i}-I1"><midi-channel>${i+2>=10?i+3:i+2}</midi-channel><midi-program>${(pt.program||0)+1}</midi-program><volume>${volPct(pt.vol??-6)}</volume></midi-instrument></score-part>`).join('');
+    let x=`<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">\n<score-partwise version="3.1"><work><work-title>${esc(o.title||'未命名')}</work-title></work><identification><encoding><software>Music Editor</software></encoding><miscellaneous><miscellaneous-field name="music-editor-settings">${esc(JSON.stringify(ME))}</miscellaneous-field></miscellaneous></identification><part-list>${plist}${noPianoX?'':'<score-part id="P1"><part-name>Piano</part-name><score-instrument id="P1-I1"><instrument-name>Acoustic Grand Piano</instrument-name></score-instrument><midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>1</midi-program><volume>'+volPct(pDb)+'</volume></midi-instrument></score-part>'}</part-list>\n`;
     const plain=(p,staff)=>{ const [type,dot]=TYPE[p.nd??p.d]||['16th',0]; const tn=tupN(p);
       if(p.rest) return p.pos===0 && p.d===arr.barSteps ? `<note><rest measure="yes"/><duration>${DV(p.d)}</duration><voice>1</voice></note>` : `<note><rest/><duration>${DV(p.d)}</duration><voice>1</voice><type>${type}</type>${dot?'<dot/>':''}${tm(p)}${tn?`<notations>${tn}</notations>`:''}</note>`;
-      const ns0=p.notes||[], st0=!p.tiedFrom && p.only && ns0.length && ns0.every(n=>n.stacc), ac0=!p.tiedFrom && ns0.some(n=>n.accent);
+      const wpre=wedge(p,0); const ns0=p.notes||[], st0=!p.tiedFrom && p.only && ns0.length && ns0.every(n=>n.stacc), ac0=!p.tiedFrom && ns0.some(n=>n.accent);
       const artX=(st0||ac0)?`<articulations>${ac0?'<accent/>':''}${st0?'<staccato/>':''}</articulations>`:'';
-      return p.pitches.map((m,i)=>{ const sp=spellPitch(m,f,PREF,spOf(p,m,PREF)); const ties=(p.tiedFrom?'<tie type="stop"/>':'')+(p.tie?'<tie type="start"/>':''); const nt=(p.tiedFrom?'<tied type="stop"/>':'')+(p.tie?'<tied type="start"/>':'')+(i?'':tn+ornXml(p)+artX);
+      return wpre+p.pitches.map((m,i)=>{ const sp=spellPitch(m,f,PREF,spOf(p,m,PREF)); const ties=(p.tiedFrom?'<tie type="stop"/>':'')+(p.tie?'<tie type="start"/>':''); const nt=(p.tiedFrom?'<tied type="stop"/>':'')+(p.tie?'<tied type="start"/>':'')+(i?'':tn+ornXml(p)+artX);
         return `<note>${i?'<chord/>':''}<pitch><step>${sp.step}</step>${sp.alter?`<alter>${sp.alter}</alter>`:''}<octave>${sp.octave}</octave></pitch><duration>${DV(p.d)}</duration>${ties}<voice>1</voice><type>${type}</type>${dot?'<dot/>':''}${tm(p)}${nt?`<notations>${nt}</notations>`:''}${i?'':lyricXml(p,'part'+staff)}</note>`; }).join(''); };
     parts.forEach((pt,i)=>{
       x+=`<part id="X${i}">\n`;
@@ -3801,11 +3810,22 @@ function loadTracks(tracks, keepArr){
   if(!keepArr && S.arr) S.arr.parts=(S.arr.parts||[]).filter(p=>!p.user);
   if(!keepArr){ S.mute=new Set(); if($('btnMute')) $('btnMute').innerHTML='🎚<span class="mtxt"> 播邊啲</span>'; S.kbView=null; S.arrMelody=null; S.chordOverride=null; S.chordB=null; S.marks={}; S.keyCh={}; S.layout={bars:S.layout.bars||0, lines:{}};
     const pi=S.pendingImport; S.pendingImport=null;   // 匯入 MusicXML：反覆記號、轉調、每行小節數照返原譜
-    S.importChords=null; if(pi){ if(pi.marks) S.marks=pi.marks; if(pi.keyChanges) S.keyCh=pi.keyChanges; if(pi.lineCounts) S.layout={bars:0, lines:pi.lineCounts}; if(pi.harmonies && pi.harmonies.length) S.importChords=pi.harmonies; }
+    S.importChords=null; S.pendingApp=pi&&pi.app||null; if(pi){ if(pi.marks) S.marks=pi.marks; if(pi.keyChanges) S.keyCh=pi.keyChanges; if(pi.lineCounts) S.layout={bars:0, lines:pi.lineCounts}; if(pi.harmonies && pi.harmonies.length) S.importChords=pi.harmonies; }
     if($('lineBars')) $('lineBars').value=String(S.layout.bars||0); }   // 新歌：唔再用之前編曲嘅旋律 / 和弦
   S.tracks=tracks.filter(t=>t.notes.length).map((t,i)=>({...t, zh:t.zh||trackZh(t.name,t.program), role:t.role||'piano', color:TRK_COLORS[i%TRK_COLORS.length]}));
   S.opts.shift=0; showEmpty(false); $('job').classList.remove('show'); renderTrackPanel(); applyTracks(false);
+  if(!keepArr && S.pendingApp) applyAppSettings(S.pendingApp); S.pendingApp=null;
 }
+// 「播邊啲」同「PDF 印邊啲」用樂器名記低（匯入之後次序可能唔同）
+function staffKeyOf(label){ if(label==='RH'||label==='LH') return label; const i=(S.arr&&S.arr.parts||[]).findIndex(p=>p.label===label); return i>=0?'P'+i:null; }
+function staffLabelOf(k){ if(k==='RH'||k==='LH') return k; const p=(S.arr&&S.arr.parts||[])[+String(k).slice(1)]; return p?p.label:null; }
+function applyAppSettings(a){ if(!S.arr || !a) return;
+  if(Array.isArray(a.mute)){ S.mute=new Set(a.mute.map(staffKeyOf).filter(Boolean)); if(S.mute.size) MuteUI.apply(); }
+  if(Array.isArray(a.pdfHide)) S.pdfHide=new Set(a.pdfHide.map(staffKeyOf).filter(Boolean));
+  if(a.metronome!=null && $('metro')){ S.metronome=!!a.metronome; $('metro').checked=S.metronome; }
+  const bits=[]; if(a.swing) bits.push('Swing '+Math.round(a.swing*100)+'%'); if(a.pianoVol) bits.push('鋼琴音量 '+a.pianoVol+' dB'); if((a.parts||[]).some(p=>p.vol!==-6)) bits.push('樂器音量');
+  if(a.accPref&&a.accPref!=='auto') bits.push(a.accPref==='flat'?'♭ 為主':'♯ 為主'); if(S.mute.size) bits.push('播邊啲'); if(S.pdfHide&&S.pdfHide.size) bits.push('PDF 印邊啲');
+  if(bits.length) setTimeout(()=>{ $('tstat').textContent+=' · 還原咗設定：'+bits.join('、'); },60); }
 function loadRaw(raw){ loadTracks([{name:'Piano',program:0,notes:raw}]); }
 // 按每條 track 嘅角色，重新組合「鋼琴譜用嘅音符」同「分析節拍用嘅全部音符」
 function applyTracks(keepPos){
@@ -3864,6 +3884,7 @@ function melodyNotes(a){ if(a.rh.length) return a.rh; const med=p=>{ const x=p.n
 function flashT(t){ $('tstat').textContent=t; }
 function refreshChrome(light){ if(!S.arr) return; document.body.classList.toggle('scratch', !!S.scratch);
   if(S.arr.accPref==null && S.opts.accPref) S.arr.accPref=S.opts.accPref; $('accPref').value=S.arr.accPref||'auto';
+  if(S.arr.pianoVol==null && S.opts.pianoVol!=null) S.arr.pianoVol=S.opts.pianoVol;
   if(S.arr.swing==null && S.opts.swing) S.arr.swing=S.opts.swing; { const sw=$('swing'), v=String(S.arr.swing||0); if(![...sw.options].some(o=>o.value===v)) sw.add(new Option('Swing '+Math.round(S.arr.swing*100)+'%', v)); sw.value=v; }
   const vis=(S.arr.parts||[]).filter(p=>!p.hidden && !p.drum);
   const all=S.arr.rh.concat(S.arr.lh,...vis.map(p=>p.notes)); if(!all.length) all.push({pitch:60}); let lo=Math.min(...all.map(n=>n.pitch)), hi=Math.max(...all.map(n=>n.pitch));
@@ -3891,8 +3912,9 @@ function rearrange(keepPos){
   if(keepClefs) S.arr.clefs=keepClefs;
   if(S.fixed && S.level===5) applyImportedMarks(S.arr);
   S.arr.parts=(S.tracks||[]).filter(t=>t.role==='staff'||t.role==='both'||t.role==='play').map(t=>({...Core.arrangePart(Core.mergeFragments(t.notes,S.fixed?0:S.opts.merge),S.an,t.role==='play'?5:S.level,S.arr.totalBars,S.arr.B,t.program),
-    label:t.zh, short:t.zh.slice(0,2), program:t.program, color:t.color, name:t.name, hidden:t.role==='play', drum:!!t.drum, vol:t.vol}));
+    label:t.zh, short:t.zh.slice(0,2), program:t.program, color:t.color, name:t.name, hidden:t.hiddenStaff??(t.role==='play'), drum:!!t.drum, vol:t.vol, inst:t.inst||undefined}));
   if(userParts.length){ S.arr.parts.push(...userParts); Core.layoutBars(S.arr, !userParts.some(p=>p.notes.some(n=>n.e>S.arr.totalBars*S.arr.barSteps))); }
+  linkHairpins(S.arr);
   refreshChrome(); syncTimesig();
   renderScore(); buildPart(); seekQ(q); if(was) play();
   $('tstat').textContent=`${S.sourceLabel} · ${S.arr.key.name.replace(/m$/,' 小調').replace(/^([A-G][#b]?)$/,'$1 大調')} · ${S.arr.meter?S.arr.meter.beats+'/'+S.arr.meter.beatType:S.arr.B+'/4'} · ♩=${S.arr.bpm} · ${S.arr.totalBars} 小節`;
@@ -4089,6 +4111,11 @@ function makeGM(program, lo, hi, vol, dest){
   return sm;
 }
 // Swing：每拍入面嘅時間拉成「長–短」：前半拍（第一粒八分）佔 r，後半拍佔 1−r（r = 0.667 就係三連音 2 : 1）。q 以四分音符計
+// 匯入嘅漸強 / 漸弱：每行譜入面，有 hpS 嘅音 → 之後第一粒有 hpE 嘅音
+function linkHairpins(arr){ if((arr.hairpins||[]).length) return; const H=[];
+  for(const L of [arr.rh, arr.lh, ...(arr.parts||[]).map(p=>p.notes)]){ const ns=L.slice().sort((a,b)=>a.s-b.s);
+    ns.forEach((n,i)=>{ if(!n.hpS) return; const e=ns.slice(i+1).find(x=>x.hpE && x.s>n.s); if(e) H.push({a:n.id, b:e.id, t:n.hpS}); }); }
+  arr.hairpins=H; }
 function swingQ(q){ const a=S.arr, r=a&&a.swing; if(!r || (a.meter && a.meter.beatType===8)) return q;
   const b=Math.floor(q+1e-9), x=q-b; return b+(x<0.5?x*2*r:r+(x-0.5)*2*(1-r)); }
 // 鋼琴（原生譜）音量：dB，0 = 原本；收細鋼琴就聽得清其他樂器
@@ -4880,8 +4907,8 @@ async function musicXMLText(buf){
 }
 async function importMusicXMLFile(file){ loadMusicXML(await musicXMLText(await file.arrayBuffer()), file.name); }
 function ensureTimesig(B, meter){ const sel=$('timesig'), v=meter&&meter.beatType!==4?meter.beats+'/'+meter.beatType:B+'/4';
-  if(![...sel.options].some(o=>o.value===v)){ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); } sel.value=v; S.opts.meter=undefined; S.opts.meterB=undefined; S.opts.accPref=undefined; S.opts.swing=undefined; S.pdfHide=null; }
-function syncTimesig(){ if(S.arr){ const keep=[S.opts.meter,S.opts.meterB,S.opts.accPref,S.opts.swing]; ensureTimesig(S.arr.B, S.arr.meter); [S.opts.meter,S.opts.meterB,S.opts.accPref,S.opts.swing]=keep; } }
+  if(![...sel.options].some(o=>o.value===v)){ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); } sel.value=v; S.opts.meter=undefined; S.opts.meterB=undefined; S.opts.accPref=undefined; S.opts.swing=undefined; S.opts.pianoVol=undefined; S.pdfHide=null; }
+function syncTimesig(){ if(S.arr){ const keep=[S.opts.meter,S.opts.meterB,S.opts.accPref,S.opts.swing,S.opts.pianoVol,S.pdfHide]; ensureTimesig(S.arr.B, S.arr.meter); [S.opts.meter,S.opts.meterB,S.opts.accPref,S.opts.swing,S.opts.pianoVol,S.pdfHide]=keep; } }
 function loadMusicXML(text, name){
   const r=parseMusicXML(text);
   stopAll(); S.audioFile=null; audioEl.removeAttribute('src');
@@ -4890,10 +4917,12 @@ function loadMusicXML(text, name){
   let saved=''; try{ saved=JSON.parse(localStorage.getItem('os.prefs')||'{}').composer||''; }catch(e){}
   S.composer=r.composer||saved; $('composer').value=S.composer;
   S.fixed={bpm:r.bpm, key:r.key, meter:r.meter, B:r.beats}; S.opts.bpm=null; S.opts.B=r.beats; ensureTimesig(r.beats, r.meter);
+  // 之前喺呢個 app 匯出嘅設定：Swing、鋼琴音量、♯/♭（樂器音量喺 track 入面）
+  if(r.swing) S.opts.swing=r.swing; if(r.pianoVol!=null) S.opts.pianoVol=r.pianoVol; if(r.appSet && r.appSet.accPref && r.appSet.accPref!=='auto') S.opts.accPref=r.appSet.accPref;
   S.pedal=r.pedal||[];
   S.sourceLabel='MusicXML'+(r.tracks.length>1?` · ${r.tracks.length} 個聲部`:'')+(r.pedal&&r.pedal.length?' + 踏板':'')+(r.unrolled?' · 已展開反覆':'');
   S.level=5; refreshLevelUI();
-  S.pendingImport={marks:r.marks, keyChanges:r.keyChanges, lineCounts:r.lineCounts, harmonies:r.harmonies};   // loadTracks 清咗設定之後先套用
+  S.pendingImport={marks:r.marks, keyChanges:r.keyChanges, lineCounts:r.lineCounts, harmonies:r.harmonies, app:r.appSet};   // loadTracks 清咗設定之後先套用
   loadTracks(r.tracks);
   const other=r.warnings.filter(w=>!/反覆/.test(w)); if(other.length) setTimeout(()=>alert('匯入完成，不過要留意：\n\n'+other.join('\n')),50);
 }
@@ -4907,13 +4936,18 @@ function parseMusicXML(text){
   const DYN={ppp:25,pp:36,p:50,mp:64,mf:80,f:96,ff:110,fff:122,sf:100,sfz:104,fp:96};
   const title=txt(doc,'work > work-title')||txt(doc,'movement-title');
   const composer=[...doc.querySelectorAll('identification > creator')].filter(c=>!c.getAttribute('type')||c.getAttribute('type')==='composer').map(c=>c.textContent.trim()).filter(Boolean).join('／');
-  const names={}; doc.querySelectorAll('part-list > score-part').forEach(sp=>{ const mp=txt(sp,'midi-instrument > midi-program'); names[sp.getAttribute('id')]={name:txt(sp,'part-name'), program:+(mp||1)-1, hasProgram:!!mp}; });
+  // 呢個 app 匯出嗰陣寫低嘅設定（Swing、音量、♯/♭…）
+  let appSet=null; for(const mf of doc.querySelectorAll('identification miscellaneous-field')) if(mf.getAttribute('name')==='music-editor-settings'){ try{ appSet=JSON.parse(mf.textContent); }catch(e){} }
+  const names={}; doc.querySelectorAll('part-list > score-part').forEach(sp=>{ const mp=txt(sp,'midi-instrument > midi-program'), vo=txt(sp,'midi-instrument > volume'), id=sp.getAttribute('id');
+    const mine=appSet && (appSet.parts||[]).find(x=>x.id===id);
+    names[id]={name:txt(sp,'part-name'), program:+(mp||1)-1, hasProgram:!!mp, vol:mine?mine.vol:(vo!==''&&vo!=null&&+vo>0?Math.round(20*Math.log10(+vo/100))-4:undefined), volPct:vo!==''&&vo!=null?+vo:undefined, inst:mine?mine.inst:undefined, hidden:mine?mine.hidden:undefined}; });
+  let swingImp=null;
   const warn=[]; let bpm=0, fifths=null, mode='major'; const keyChange=new Set();
   // ---- 第一步：逐個聲部、逐個小節讀（位置以四分音符計，相對小節開頭）----
   const P=[...doc.querySelectorAll('score-partwise > part')].map((part,pi)=>{
     let div=1, staves=1, trans=0, vel=80, pendDyn=null, time=null, partKey=null;
     const M=kids(part,'measure').map(meas=>{
-      const info={notes:[], ped:[], harm:[], len:0, implicit:meas.getAttribute('implicit')==='yes', time:null, fwd:false, back:0, ending:null, jump:{}, key:null,
+      const info={notes:[], ped:[], harm:[], wedges:[], len:0, implicit:meas.getAttribute('implicit')==='yes', time:null, fwd:false, back:0, ending:null, jump:{}, key:null,
         newSys:!!q(meas,':scope > print[new-system="yes"], :scope > print[new-page="yes"]')};
       let pos=0, maxPos=0, lastStart=0;
       const jumps=(snd)=>{ if(!snd) return; for(const k of ['dacapo','dalsegno','tocoda','fine','segno','coda']) if(snd.getAttribute(k)!=null) info.jump[k]=snd.getAttribute(k)||'yes';
@@ -4930,6 +4964,8 @@ function parseMusicXML(text){
           jumps(q(el,'sound'));
           const pm=q(el,'metronome > per-minute'); if(pm && !bpm){ const bu=txt(el,'metronome > beat-unit'), dot=!!q(el,'metronome > beat-unit-dot');
             const k=({whole:4,half:2,quarter:1,eighth:0.5,'16th':0.25})[bu]||1; bpm=+pm.textContent*k*(dot?1.5:1); }
+          { const sw=q(el,'sound > swing'); if(sw && swingImp==null){ if(q(sw,'straight')) swingImp=0; else { const a=+txt(sw,'first')||0, b=+txt(sw,'second')||0; if(a>0&&b>0) swingImp=Math.round(a/(a+b)*1000)/1000; } } }
+          for(const wg of el.querySelectorAll('direction-type > wedge')){ const ty=wg.getAttribute('type'); if(ty==='crescendo'||ty==='diminuendo'||ty==='stop') info.wedges.push({at, staff:+(txt(el,':scope > staff')||1), t:ty==='crescendo'?'<':ty==='diminuendo'?'>':'stop'}); }
           const dy=q(el,'dynamics'); if(dy && dy.firstElementChild && DYN[dy.firstElementChild.nodeName]){ vel=DYN[dy.firstElementChild.nodeName]; const nm=dy.firstElementChild.nodeName; if(/^(ppp|pp|p|mp|mf|f|ff|fff)$/.test(nm)) pendDyn=nm.replace('fff','ff').replace('ppp','pp'); }
           for(const pd of el.querySelectorAll('pedal')){ const ty=pd.getAttribute('type'); if(ty==='start'||ty==='resume') info.ped.push([at,'down']); else if(ty==='stop'||ty==='discontinue') info.ped.push([at,'up']); else if(ty==='change'){ info.ped.push([at,'up']); info.ped.push([at,'down']); } }
           if(q(el,'direction-type > segno')) info.jump.segno='yes'; if(q(el,'direction-type > coda')) info.jump.coda=info.jump.coda||'yes';
@@ -4976,7 +5012,12 @@ function parseMusicXML(text){
           if(!isChord){ lastStart=pos; pos+=dur; } maxPos=Math.max(maxPos,pos);
         }
       }
-      info.len=Math.max(pos,maxPos); return info;
+      info.len=Math.max(pos,maxPos);
+      // 漸強 / 漸弱：開始 = 嗰個位置或者之後第一粒音；stop = 嗰個位置嘅音，冇就係之前最後一粒
+      for(const w of info.wedges){ const ns=info.notes.filter(n=>(n.staff||1)===w.staff && !n.tieStop).sort((a,b)=>a.qs-b.qs);
+        if(w.t==='stop'){ const n=ns.find(n=>Math.abs(n.qs-w.at)<1e-3) || ns.filter(n=>n.qs<w.at+1e-3).pop() || ns[0]; if(n) n.hpE=true; }
+        else { const n=ns.find(n=>n.qs>=w.at-1e-3); if(n) n.hpS=w.t; } }
+      return info;
     });
     return {id:part.getAttribute('id'), M, staves, trans};
   });
@@ -5056,7 +5097,7 @@ function parseMusicXML(text){
     });
     if(!notes.length) return;
     const info=names[pp.id]||{name:'Part '+(pi+1),program:0};
-    tracks.push({name:info.name||('Part '+(pi+1)), program:info.program, hasProgram:info.hasProgram, notes, staves:pp.staves});
+    tracks.push({name:info.name||('Part '+(pi+1)), program:info.program, hasProgram:info.hasProgram, notes, staves:pp.staves, vol:info.vol, inst:info.inst, hidden:info.hidden, volPct:info.volPct});
   });
   if(!tracks.length) throw new Error('樂譜入面冇音符');
   const harmonies=[]; { const hp=P.find(pp=>pp.M.some(m=>m&&m.harm.length)); if(hp) order.forEach((k,j)=>{ const m=hp.M[k]; if(m) for(const h of m.harm) harmonies.push({...h, q:off[j]+h.q+(0)}); }); }
@@ -5071,10 +5112,10 @@ function parseMusicXML(text){
     // 每行譜嘅主聲部 = 嗰行最細嘅聲部號碼；其他聲部（例如長音）係第二聲部
     const prim={}; for(const n of t.notes) prim[n.staff]=Math.min(prim[n.staff]??99, n.voice);
     const ns=t.notes.map(n=>{ const sec0=toSec(n.qs), sec1=toSec(n.qe), len=sec1-sec0;
-      return {pitch:n.midi, start:sec0, end:n.art.stacc?sec0+Math.min(len*0.35,0.18):sec1, velocity:n.vel, art:n.art, slur:n.slur, dyn0:n.dyn0, ly:n.ly, orn:n.orn, sp:n.sp,
+      return {pitch:n.midi, start:sec0, end:n.art.stacc?sec0+Math.min(len*0.35,0.18):sec1, velocity:n.vel, art:n.art, slur:n.slur, dyn0:n.dyn0, ly:n.ly, orn:n.orn, sp:n.sp, hpS:n.hpS, hpE:n.hpE,
         qs:n.qs+pick, qe:n.qe+pick, v2:isPiano && t.staves>=2 && n.voice!==prim[n.staff] ? true : undefined,
         hand:isPiano?(t.staves>=2?(n.staff===1?'r':'l'):(n.midi>=60?'r':'l')):undefined}; });
-    return {name:isPiano?'Piano':t.name, zh:isPiano?'鋼琴':t.name, program:t.program, notes:ns.sort((a,b)=>a.start-b.start), role:isPiano?'piano':'staff'};
+    return {name:isPiano?'Piano':t.name, zh:isPiano?'鋼琴':t.name, program:t.program, notes:ns.sort((a,b)=>a.start-b.start), role:isPiano?'piano':'staff', vol:isPiano?undefined:t.vol, inst:t.inst, hiddenStaff:t.hidden, volPct:t.volPct};
   });
   // 掃描（Audiveris）認唔到鋼琴大括號：每行譜變咗一個叫「Voice」/「Part 1」嘅聲部 → 全部係通用名就當鋼琴：高音譜 = 右手、低音譜 = 左手
   { const gen=t=>!t.name || /^(voice|part|p|staff|track|instrument)\s*\d*$/i.test(String(t.name).trim());
@@ -5090,7 +5131,9 @@ function parseMusicXML(text){
       out=out.filter(t=>!cands.includes(t)); pianoT.notes.sort((a,b)=>a.start-b.start); warn.push(`掃描出嚟有 ${cands.length} 行譜俾當咗做其他樂器（其實係鋼琴），已經併返入鋼琴譜`); } }
   let key=null; if(fifths!=null){ key={fifths, mode:/minor/i.test(mode)?'minor':'major'}; key.name=Core.keyName(key); }
   harmonies.forEach(h=>h.q+=pick);
-  return {harmonies, title, composer, bpm, beats:B, meter, key, tracks:out, pedal:ped, warnings:warn, measures:order.length, order, marks, keyChanges, lineCounts, unrolled:!keepRep && order.length>nM, struct:S0.map((m,i)=>({i,fwd:m.fwd,back:m.back,nums:m.nums,jump:m.jump,len:L[i]}))};
+  // 冇 app 設定、但有標準 <volume>：鋼琴音量按佢同其他樂器嘅比例
+  const pv=out.find(t=>t.role==='piano'), pianoVolImp=appSet?appSet.pianoVol:(pv&&pv.volPct>0&&pv.volPct<100?Math.round(20*Math.log10(pv.volPct/100)):undefined);
+  return {appSet, swing:appSet?appSet.swing:swingImp, pianoVol:pianoVolImp, harmonies, title, composer, bpm, beats:B, meter, key, tracks:out, pedal:ped, warnings:warn, measures:order.length, order, marks, keyChanges, lineCounts, unrolled:!keepRep && order.length>nM, struct:S0.map((m,i)=>({i,fwd:m.fwd,back:m.back,nums:m.nums,jump:m.jump,len:L[i]}))};
 }
 
 /* ---------- PDF：設定 + 預覽 + 下載 ---------- */
@@ -5203,7 +5246,7 @@ function makeMidi(kind){
 }
 document.querySelectorAll('[data-exp]').forEach(b=>b.onclick=()=>{ if(!S.arr) return; const k=b.dataset.exp, lv='_Lv'+S.level;
   if(k==='mp3') exportMp3();
-  if(k==='xml') download(new Blob([Core.toMusicXML(S.arr,{...scoreOpts(0), systems:(S.layout.bars||Object.keys(S.layout.lines||{}).length)?S.lines:null})],{type:'application/vnd.recordare.musicxml+xml'}), safe()+lv+'.musicxml');
+  if(k==='xml') download(new Blob([Core.toMusicXML(S.arr,{...scoreOpts(0), appSettings:{mute:[...(S.mute||[])].map(staffLabelOf).filter(Boolean), pdfHide:[...(S.pdfHide||[])].map(staffLabelOf).filter(Boolean), metronome:!!S.metronome}, systems:(S.layout.bars||Object.keys(S.layout.lines||{}).length)?S.lines:null})],{type:'application/vnd.recordare.musicxml+xml'}), safe()+lv+'.musicxml');
   if(k==='midi') download(makeMidi('score'), safe()+lv+'.mid');
   if(k==='rawmidi' && S.scratch){ alert('自己寫嘅譜冇「AI 原始轉錄」，請揀「MIDI — 樂譜版」。'); return; }
   if(k==='rawmidi') download(makeMidi('raw'), safe()+'_raw.mid');
