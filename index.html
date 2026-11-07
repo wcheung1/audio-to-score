@@ -942,6 +942,7 @@ body.roll-keys .roll .legend, body.roll-keys .roll .roll-hint{display:none}
         <label>行同行之間（毫米）<input type="number" id="pdGap" min="0" max="40" step="1" value="5"></label>
         <label>頁碼 <select id="pdPageNo"><option value="c">底部中間「1 / 5」</option><option value="r">底部右邊「1」</option><option value="off">唔要</option></select></label>
         <label>每頁頂寫歌名 <select id="pdHeader"><option value="1">第 2 頁起寫細字</option><option value="0">唔要</option></select></label>
+        <label title="歌名右下面嗰行「Lv5 完整」">寫程度（Lv1–Lv5） <select id="pdLevel"><option value="1">寫</option><option value="0">唔寫</option></select></label>
         <div id="pdStaves" class="pdstaves"></div>
         <p class="muted">「每頁行數」揀咗數字，行同行之間會自動拉勻；放唔落嘅話會自動縮細少少。</p>
       </div>
@@ -3830,7 +3831,8 @@ function loadRaw(raw){ loadTracks([{name:'Piano',program:0,notes:raw}]); }
 // 按每條 track 嘅角色，重新組合「鋼琴譜用嘅音符」同「分析節拍用嘅全部音符」
 function applyTracks(keepPos){
   const on=S.tracks.filter(t=>t.role!=='off');
-  S.rawOrig=S.tracks.filter(t=>t.role==='piano'||t.role==='both').flatMap(t=>t.notes).sort((a,b)=>a.start-b.start);
+  // 「鋼琴右手（單手旋律）」：成條聲部放入鋼琴右手，唔理分手點（例如掃描出嚟只有一條「Voice」）
+  S.rawOrig=S.tracks.filter(t=>t.role==='piano'||t.role==='both'||t.role==='rh').flatMap(t=>t.role==='rh'?t.notes.map(n=>(n.hand==='r'?n:(n.hand='r',n))):t.notes).sort((a,b)=>a.start-b.start);
   const mg=S.fixed?0:S.opts.merge;   // 匯入樂譜：每粒音都係準確嘅，唔使合併斷音
   S.raw=Core.mergeFragments(S.rawOrig,mg);
   S.allRaw=Core.mergeFragments(on.flatMap(t=>t.notes).sort((a,b)=>a.start-b.start),mg);
@@ -3838,14 +3840,17 @@ function applyTracks(keepPos){
   reanalyze(keepPos);
 }
 function renderTrackPanel(){
-  const many=S.tracks.length>1; $('trkMenu').style.display=many?'':'none'; if(!many) return;
+  // 得一條聲部、但唔係鋼琴（例如掃描出嚟淨係一條「Voice」）都要顯示，等你改做鋼琴右手
+  const many=S.tracks.length>1 || (S.tracks.length===1 && S.tracks[0].role!=='piano'); $('trkMenu').style.display=many?'':'none'; if(!many) return;
   const box=$('trkList'); box.innerHTML='';
   S.tracks.forEach((t,i)=>{
     const row=document.createElement('div'); row.className='trk';
     row.innerHTML=`<i style="background:${t.role==='off'?'#555':t.role==='piano'?'#34d399':t.role==='play'?'#8b95a1':t.color}"></i><div><input value="${t.zh.replace(/"/g,'&quot;')}" title="樂器名（可以改）"><small>${t.notes.length} 粒音${t.name&&t.name!==t.zh?' · '+t.name:''}</small></div>
-      <select>${t.drum?'':'<option value="piano">鋼琴譜</option><option value="both">鋼琴譜＋獨立一行</option><option value="staff">獨立一行</option>'}<option value="play">只播放（唔顯示）</option><option value="off">靜音＋隱藏</option></select>`;
+      <select>${t.drum?'':'<option value="piano">鋼琴譜</option><option value="rh">鋼琴右手（單手旋律）</option><option value="both">鋼琴譜＋獨立一行</option><option value="staff">獨立一行</option>'}<option value="play">只播放（唔顯示）</option><option value="off">靜音＋隱藏</option></select>`;
     const sel=row.querySelector('select'); sel.value=t.role;
-    sel.onchange=()=>{ t.role=sel.value; renderTrackPanel(); applyTracks(true); };
+    sel.onchange=()=>{ if(t.role==='rh' && sel.value!=='rh') for(const n of t.notes) if(n._hand0!==undefined){ n.hand=n._hand0; } 
+      if(sel.value==='rh') for(const n of t.notes) if(n._hand0===undefined) n._hand0=n.hand??null;
+      t.role=sel.value; renderTrackPanel(); applyTracks(true); };
     const inp=row.querySelector('input'); inp.onchange=()=>{ t.zh=inp.value.trim()||t.zh; if(t.role==='staff'||t.role==='both') rearrange(true); };
     box.appendChild(row);
   });
@@ -5121,7 +5126,10 @@ function parseMusicXML(text){
   { const gen=t=>!t.name || /^(voice|part|p|staff|track|instrument)\s*\d*$/i.test(String(t.name).trim());
     if(out.length>=2 && !out.some(t=>t.role==='piano') && out.every(gen)){ const med=t=>{ const ps=t.notes.map(n=>n.pitch).sort((a,b)=>a-b); return ps[ps.length>>1]??60; };
       const notes=[]; for(const t of out){ const h=med(t)>=57?'r':'l'; for(const n of t.notes){ n.hand=h; n.v2=undefined; notes.push(n); } }
-      out=[{name:'Piano', zh:'鋼琴', program:0, role:'piano', notes:notes.sort((a,b)=>a.start-b.start)}]; warn.push('掃描出嚟嘅譜行冇樂器名，當咗係鋼琴（高音譜 = 右手、低音譜 = 左手）'); } }
+      out=[{name:'Piano', zh:'鋼琴', program:0, role:'piano', notes:notes.sort((a,b)=>a.start-b.start)}]; warn.push('掃描出嚟嘅譜行冇樂器名，當咗係鋼琴（高音譜 = 右手、低音譜 = 左手）'); }
+    // 成份譜得一條旋律（例如掃描出嚟叫「Voice」）→ 當鋼琴右手，咁先有旋律可以配和弦、自動編曲（「🎛 聲部」可以改返）
+    else if(out.length===1 && out[0].role!=='piano' && (gen(out[0]) || /vocal|voice|sing|soprano|melody|lead|人聲|主唱|旋律|歌/i.test(String(out[0].name)))){
+      out[0].role='rh'; for(const n of out[0].notes){ n.hand='r'; n.v2=undefined; } } }
   // 掃描（Audiveris）有時將某幾頁嘅鋼琴譜當咗做另外嘅聲部（例如叫「Voice」），而嗰幾個小節鋼琴就冇音：併返入鋼琴
   const pianoT=out.find(t=>t.role==='piano');
   if(pianoT && out.length>1){ const barOf=q=>Math.floor((q+1e-6)/barQ), pb=new Set(pianoT.notes.map(n=>barOf(n.qs)));
@@ -5161,7 +5169,7 @@ async function layoutPDF(st){
   const box=document.createElement('div'); box.style.cssText=`position:fixed;left:-30000px;top:0;width:${pxW+20}px;background:#fff`;
   document.body.appendChild(box);
   try{
-    const so=scoreOpts(pxW); if(st.bars){ so.barsPerLine=st.bars; so.lineCounts=null; } so.hide=pdfHide();
+    const so=scoreOpts(pxW); if(st.bars){ so.barsPerLine=st.bars; so.lineCounts=null; } so.hide=pdfHide(); if($('pdLevel').value==='0') so.subtitle='';
     if(pdfStaffList().every(([k])=>so.hide.has(k))) throw new Error('最少要印一行譜');
     ABCJS.renderAbc(box, Core.toABC(S.arr,so), {add_classes:true, staffwidth:pxW, paddingleft:6, paddingright:6, paddingtop:10, paddingbottom:14, oneSvgPerLine:true});
     drawOttavaLines(box);
@@ -5210,8 +5218,8 @@ function drawPdfStaves(){ const L=pdfStaffList(), box=$('pdStaves'); if(L.length
 function exportPDF(){ if(!S.arr) return;
   try{ const saved=JSON.parse(localStorage.getItem('os.pdf')||'{}'); for(const [k,v] of Object.entries(saved)) if($(k)) $(k).value=v; }catch(e){}
   drawPdfStaves(); $('pdfDlg').hidden=false; PDFi=0; refreshPdfPreview(); }
-['pdPaper','pdOrient','pdMarginPreset','pdScale','pdBars','pdRows','pdGap','pdPageNo','pdHeader'].forEach(id=>$(id).addEventListener('input',()=>{
-  try{ const o={}; ['pdPaper','pdOrient','pdMarginPreset','pdScale','pdBars','pdRows','pdGap','pdPageNo','pdHeader'].forEach(k=>o[k]=$(k).value); localStorage.setItem('os.pdf',JSON.stringify(o)); }catch(e){}
+['pdPaper','pdOrient','pdMarginPreset','pdScale','pdBars','pdRows','pdGap','pdPageNo','pdHeader','pdLevel'].forEach(id=>$(id).addEventListener('input',()=>{
+  try{ const o={}; ['pdPaper','pdOrient','pdMarginPreset','pdScale','pdBars','pdRows','pdGap','pdPageNo','pdHeader','pdLevel'].forEach(k=>o[k]=$(k).value); localStorage.setItem('os.pdf',JSON.stringify(o)); }catch(e){}
   clearTimeout(pdfTimer); pdfTimer=setTimeout(refreshPdfPreview,250); }));
 $('pdPrev').onclick=()=>{ if(PDFL&&PDFi>0) drawPreview(PDFL,--PDFi); };
 $('pdNext').onclick=()=>{ if(PDFL&&PDFi<PDFL.pages.length-1) drawPreview(PDFL,++PDFi); };
@@ -5226,7 +5234,7 @@ $('pdSave').onclick=async()=>{
       if(st.pageNo==='r') pdf.text(String(i), L.W-L.M, L.H-L.M*0.6, {align:'right'});
       if(st.header && i>1){ const tc=textCanvas(S.title); const hh=3.2; pdf.addImage(tc.toDataURL('image/png'),'PNG',L.M,L.M-hh-0.5,tc.width/tc.height*hh,hh); } }
     const hid=pdfHide(), inc=pdfStaffList().filter(([k])=>!hid.has(k)).map(([,zh])=>zh.replace(/（.*）/,''));
-    pdf.save(safe()+(hid.size?'_'+inc.join('+'):'_Lv'+S.level)+'.pdf'); $('pdStatus').textContent='已下載'; }
+    pdf.save(safe()+(hid.size?'_'+inc.join('+'):$('pdLevel').value==='0'?'':'_Lv'+S.level)+'.pdf'); $('pdStatus').textContent='已下載'; }
   catch(err){ console.error(err); $('pdStatus').textContent='失敗：'+(err.message||err); } };
 
 function makeMidi(kind){
@@ -5787,7 +5795,7 @@ const ArrUI=(()=>{
       const med=t=>{ const p=t.notes.map(n=>n.pitch).sort((a,b)=>a-b); return p[p.length>>1]||0; };
       src=(S.tracks||[]).filter(t=>!t.drum && t.notes.length).sort((a,b)=>med(b)-med(a))[0]; }
     if(src) notes=src.notes.map(n=>({pitch:n.pitch, qs:Math.max(0,toQ(n,false)), qe:Math.max(toQ(n,true), toQ(n,false)+0.25)}));
-    else { const a=(S.scratch||S.dirty||!S.raw)?S.arr:Core.arrange(S.raw,S.an,5,{split:S.opts.split,key:S.opts.key,minQ:0}); const by=new Map();
+    else { let a=(S.scratch||S.dirty||!S.raw)?S.arr:Core.arrange(S.raw,S.an,5,{split:S.opts.split,key:S.opts.key,minQ:0}); if(!a.rh.length && !a.lh.length) a=S.arr; const by=new Map();   // 鋼琴冇音（例如只有一條「Voice」）→ 用其他樂器嘅旋律
       for(const n of melodyNotes(a)){ const c=by.get(n.s); if(!c||n.pitch>c.pitch) by.set(n.s,n); }
       const xs=[...by.values()].sort((x,y)=>x.s-y.s); notes=xs.map((n,i)=>({pitch:n.pitch, qs:n.s/4, qe:Math.min(n.e, xs[i+1]?xs[i+1].s:n.e)/4})); }
     notes=notes.filter(n=>n.qe>n.qs).sort((a,b)=>a.qs-b.qs);
@@ -6081,7 +6089,7 @@ const ChordUI=(()=>{
     let notes;
     const mt=(S.tracks||[]).find(t=>t.isMelody && !t.isAcc && t.role!=='off');
     if(mt) notes=mt.notes.map(n=>({pitch:n.pitch, qs:Math.max(0,toQ(n,false)), qe:toQ(n,true)}));
-    else { const a=(S.scratch||S.dirty||!S.raw)?S.arr:Core.arrange(S.raw,S.an,5,{split:S.opts.split,key:S.opts.key,minQ:0}); const by=new Map();
+    else { let a=(S.scratch||S.dirty||!S.raw)?S.arr:Core.arrange(S.raw,S.an,5,{split:S.opts.split,key:S.opts.key,minQ:0}); if(!a.rh.length && !a.lh.length) a=S.arr; const by=new Map();   // 鋼琴冇音（例如只有一條「Voice」）→ 用其他樂器嘅旋律
       for(const n of melodyNotes(a)){ const c=by.get(n.s); if(!c||n.pitch>c.pitch) by.set(n.s,n); }
       const xs=[...by.values()].sort((x,y)=>x.s-y.s); notes=xs.map((n,i)=>({pitch:n.pitch, qs:n.s/4, qe:Math.min(n.e, xs[i+1]?xs[i+1].s:n.e)/4})); }
     notes=notes.filter(n=>n.qe>n.qs).sort((a,b)=>a.qs-b.qs);
@@ -6555,7 +6563,7 @@ const ChordUI=(()=>{
       const acc=markRoll(accNotes(pat).map(n=>({pitch:n.pitch, start:toSec(n.qs), end:toSec(n.qe), velocity:n.vel, qs:n.qs, qe:n.qe, hand:'l', orn:n.orn})));
       if(cel){ tracks.push({name:'Cello', zh:'大提琴', program:42, role:'staff', isAcc:true, notes:acc.map(n=>({...n, hand:undefined}))}); msg='和弦名已經寫上，加咗一行大提琴伴奏（原譜冇郁）。'; }
       else if(place==='lh'){
-        const piano=tracks.filter(t=>t.role==='piano'||t.role==='both');
+        const piano=tracks.filter(t=>t.role==='piano'||t.role==='both'||t.role==='rh');
         const handed=piano.every(t=>t.notes.every(n=>n.hand));
         if(handed){ for(const t of piano) t.notes=t.notes.filter(n=>n.hand!=='l'); tracks.push({name:'Accompaniment', zh:'伴奏（左手）', program:0, role:'piano', isAcc:true, notes:acc}); msg='和弦名已經寫上；原本左手換咗做新伴奏（右手旋律冇郁，撳「↩ 還原原譜」可以攞返原本左手）。'; }
         else { tracks.push({name:'Accompaniment', zh:'伴奏', program:0, role:'staff', isAcc:true, notes:acc}); msg='呢份譜分唔到左右手，所以伴奏加咗做獨立一行，原譜冇郁。'; }
@@ -6583,7 +6591,7 @@ const ChordUI=(()=>{
     if(CH.sig!==sig){ CH.sig=sig; CH.pts=[]; CH.sel=null; CH.backup=null; CH.vers=null; CH.bz=null; $('bzLog').hidden=true; $('bzMsg').textContent=''; CH.keepUser=null; CH.verSel=0; CH.segs=[]; $('chFrom').value=1; renderVers();
       // 用返譜上面已經有嘅和弦（例如之前配過）
       $('chKey').value=I.key.tonic+':'+I.key.mode; $('chRate').value=I.B===4&&!I.compound?'half':'bar'; $('chPreset').value='triad'; $('chStrict').checked=true; $('chPat').value='rolled';
-      const hasLH=(S.tracks||[]).some(t=>(t.role==='piano'||t.role==='both') && t.notes.some(n=>n.hand==='l'));
+      const hasLH=(S.tracks||[]).some(t=>(t.role==='piano'||t.role==='both'||t.role==='rh') && t.notes.some(n=>n.hand==='l'));
       $('chPlace').value=hasLH?'staff':'lh';
       if(S.chordOverride){ prep(); S.chordOverride.forEach((list,b)=>(list||[]).forEach(c=>{ if(c && !c.carried) CH.pts.push({q:b*I.B+c.step/4, root:c.root, suf:c.suf, bass:c.bass??c.root, src:'user'}); })); }
       else if(S.importChords && S.importChords.length){ prep(); let last=null; for(const h of S.importChords){ if(last && last.root===h.root && last.suf===h.suf && last.bass===h.bass) continue; CH.pts.push({q:h.q, root:h.root, suf:h.suf, bass:h.bass, src:'user'}); last=h; }
