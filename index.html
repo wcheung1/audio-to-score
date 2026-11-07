@@ -318,6 +318,9 @@ body.editing .editbar{display:flex}
 .pdfgrid label{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;margin:5px 0;color:#333}
 .pdfgrid select,.pdfgrid input[type=number]{width:110px;padding:4px 6px;border:1px solid #c9d1d9;border-radius:6px;color:#111}
 .pdfgrid input[type=range]{width:110px}
+.pdstaves{border-top:1px dashed #c9d1d9;margin-top:8px;padding-top:6px;font-size:13px;color:#333}
+.pdstaves b{display:block;margin-bottom:2px}.pdstaves label{justify-content:flex-start!important;margin:3px 0!important}
+.pdstaves label input{width:auto!important}
 .pdfprev{background:#d9dee3;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;min-height:420px}
 .pdfprev canvas{background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.2);max-width:100%;max-height:62vh}
 .pdfnav{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;color:#333}
@@ -938,6 +941,7 @@ body.roll-keys .roll .legend, body.roll-keys .roll .roll-hint{display:none}
         <label>行同行之間（毫米）<input type="number" id="pdGap" min="0" max="40" step="1" value="5"></label>
         <label>頁碼 <select id="pdPageNo"><option value="c">底部中間「1 / 5」</option><option value="r">底部右邊「1」</option><option value="off">唔要</option></select></label>
         <label>每頁頂寫歌名 <select id="pdHeader"><option value="1">第 2 頁起寫細字</option><option value="0">唔要</option></select></label>
+        <div id="pdStaves" class="pdstaves"></div>
         <p class="muted">「每頁行數」揀咗數字，行同行之間會自動拉勻；放唔落嘅話會自動縮細少少。</p>
       </div>
       <div class="pdfprev"><canvas id="pdCanvas" width="420" height="594"></canvas>
@@ -1772,15 +1776,17 @@ const Core = (() => {
     if(o.subtitle && show.level) abc+=`C:${esc(o.subtitle)}\n`;
     if(show.barnum==='all') abc+='%%barnumbers 1\n'; else if(show.barnum==='line') abc+='%%barnumbers 0\n';
     // 自己加嘅鼓（user）會用敲擊樂譜表（perc）顯示；自動編曲嘅鼓只係播放
-    const parts=(arr.parts||[]).filter(p=>!p.hidden && (!p.drum || p.user)), vname=s=>String(s).replace(/["\r\n]/g,'');
+    // o.hide：呢次唔印嘅譜行（例如匯出 PDF 淨係要大提琴：{'RH','LH'}；大提琴 + 鋼琴右手：{'LH'}）
+    const HIDE=o.hide||new Set(), showRH=!HIDE.has('RH'), showLH=!HIDE.has('LH');
+    const parts=(arr.parts||[]).filter(p=>!p.hidden && (!p.drum || p.user) && !HIDE.has('P'+arr.parts.indexOf(p))), vname=s=>String(s).replace(/["\r\n]/g,'');
     const pianoName=parts.length?' name="鋼琴" snm="琴"':'';
-    const noPiano=parts.length>0 && !arr.rh.length && !arr.lh.length && !arr.showPiano; // 全部樂器都獨立一行就唔使空白鋼琴譜
+    const noPiano=(parts.length>0 && !arr.rh.length && !arr.lh.length && !arr.showPiano) || (!showRH && !showLH); // 全部樂器都獨立一行就唔使空白鋼琴譜
     const R2=!!arr.rh2Bars, L2=!!arr.lh2Bars;
     const meter=arr.meter?arr.meter.beats+'/'+arr.meter.beatType:arr.B+'/4';
-    abc+=`M:${meter}\nL:1/16\nQ:1/4=${arr.bpm}\n%%score ${parts.map((p,i)=>'(P'+i+')').join(' ')}${noPiano?'':` {${R2?'(RH RH2)':'RH'} | ${L2?'(LH LH2)':'LH'}}`}\n`;
+    abc+=`M:${meter}\nL:1/16\nQ:1/4=${arr.bpm}\n%%score ${parts.map((p,i)=>'(P'+i+')').join(' ')}${noPiano?'':showRH&&showLH?` {${R2?'(RH RH2)':'RH'} | ${L2?'(LH LH2)':'LH'}}`:showRH?` ${R2?'(RH RH2)':'RH'}`:` ${L2?'(LH LH2)':'LH'}`}\n`;
     parts.forEach((pt,i)=>{ abc+=`V:P${i} clef=${pt.drum?'perc':clefAt(arr,'P'+arr.parts.indexOf(pt),0)} name="${vname(pt.label)}" snm="${vname(pt.short||'')}"\n`; });
     const cR=clefAt(arr,'RH',0), cL=clefAt(arr,'LH',0);
-    if(!noPiano) abc+=`V:RH clef=${cR}${pianoName}${R2?' stem=up':''}\n${R2?`V:RH2 clef=${cR} stem=down\n`:''}V:LH clef=${cL}${L2?' stem=up':''}\n${L2?`V:LH2 clef=${cL} stem=down\n`:''}`;
+    if(!noPiano) abc+=(showRH?`V:RH clef=${cR}${pianoName}${R2?' stem=up':''}\n${R2?`V:RH2 clef=${cR} stem=down\n`:''}`:'')+(showLH?`V:LH clef=${cL}${showRH?'':pianoName}${L2?' stem=up':''}\n${L2?`V:LH2 clef=${cL} stem=down\n`:''}`:'');
     abc+=`K:${keyName(arr.key)}\n`;
     // 鼓（GM 音高）→ 敲擊樂譜表位置：[音名, 係咪用 ✕ 符頭]
     const DRUM_POS={35:['F',0],36:['F',0],37:['c',1],38:['c',0],40:['c',0],39:['c',1],41:['A',0],43:['G',0],45:['d',0],47:['d',0],48:['e',0],50:['e',0],
@@ -1809,7 +1815,7 @@ const Core = (() => {
       parts.forEach((pt,i)=>{ const vid='P'+arr.parts.indexOf(pt); abc+=(pt.drum?`[V:P${i}] `:vTag('P'+i,vid,ln[0]))+keyTag(ln[0],vid)+lineStart(ln[0]); ln.forEach((b,k)=>{ if(k) abc+=sep(k); setKey(b); abc+=partBar(pt.bars[b]||[], b, abc.length, vid, pt); }); abc+=end;
         if(!pt.drum) abc+=lyLines(ln.map(b=>pt.bars[b]||[])); });
       if(!noPiano) for(const [v,bars] of [['RH',arr.rhBars],['RH2',arr.rh2Bars],['LH',arr.lhBars],['LH2',arr.lh2Bars]]){
-        if(!bars) continue; const sub=v.endsWith('2');
+        if(!bars || (v[0]==='R'?!showRH:!showLH)) continue; const sub=v.endsWith('2');
         lineMarks(bars,ln);
         abc+=vTag(v,v.slice(0,2),ln[0])+(sub?'':keyTag(ln[0],v))+lineStart(ln[0]);   // 同一行譜嘅第二聲部唔可以再寫轉調（abcjs 會死）
         ln.forEach((i,k)=>{ if(k) abc+=sep(k); setKey(i); abc+=barStr(bars[i],i,v[0]==='R',abc.length,o.map,v.slice(0,2),sub); });
@@ -4862,7 +4868,7 @@ async function musicXMLText(buf){
 }
 async function importMusicXMLFile(file){ loadMusicXML(await musicXMLText(await file.arrayBuffer()), file.name); }
 function ensureTimesig(B, meter){ const sel=$('timesig'), v=meter&&meter.beatType!==4?meter.beats+'/'+meter.beatType:B+'/4';
-  if(![...sel.options].some(o=>o.value===v)){ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); } sel.value=v; S.opts.meter=undefined; S.opts.meterB=undefined; S.opts.accPref=undefined; }
+  if(![...sel.options].some(o=>o.value===v)){ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); } sel.value=v; S.opts.meter=undefined; S.opts.meterB=undefined; S.opts.accPref=undefined; S.pdfHide=null; }
 function syncTimesig(){ if(S.arr){ const keep=[S.opts.meter,S.opts.meterB,S.opts.accPref]; ensureTimesig(S.arr.B, S.arr.meter); [S.opts.meter,S.opts.meterB,S.opts.accPref]=keep; } }
 function loadMusicXML(text, name){
   const r=parseMusicXML(text);
@@ -5100,7 +5106,8 @@ async function layoutPDF(st){
   const box=document.createElement('div'); box.style.cssText=`position:fixed;left:-30000px;top:0;width:${pxW+20}px;background:#fff`;
   document.body.appendChild(box);
   try{
-    const so=scoreOpts(pxW); if(st.bars){ so.barsPerLine=st.bars; so.lineCounts=null; }
+    const so=scoreOpts(pxW); if(st.bars){ so.barsPerLine=st.bars; so.lineCounts=null; } so.hide=pdfHide();
+    if(pdfStaffList().every(([k])=>so.hide.has(k))) throw new Error('最少要印一行譜');
     ABCJS.renderAbc(box, Core.toABC(S.arr,so), {add_classes:true, staffwidth:pxW, paddingleft:6, paddingright:6, paddingtop:10, paddingbottom:14, oneSvgPerLine:true});
     drawOttavaLines(box);
     const ims=[]; for(const svg of box.querySelectorAll('svg')) ims.push(await svgToPng(svg,3));
@@ -5134,9 +5141,20 @@ function drawPreview(L, idx){
 }
 let PDFL=null, PDFi=0, pdfTimer=null;
 async function refreshPdfPreview(){ $('pdStatus').textContent='排版中…'; try{ PDFL=await layoutPDF(pdfSettings()); PDFi=Math.min(PDFi,PDFL.pages.length-1); drawPreview(PDFL,PDFi); $('pdStatus').textContent=`共 ${PDFL.pages.length} 頁`; }catch(e){ console.error(e); $('pdStatus').textContent='排版失敗：'+e.message; } }
+// 印邊啲譜行：鋼琴右手 / 左手、每種樂器（只係 PDF 用，唔會改到份譜）
+function pdfStaffList(){ const a=S.arr, out=[]; const parts=(a.parts||[]).map((p,i)=>[p,i]).filter(([p])=>!p.hidden && (!p.drum||p.user));
+  const piano=!(parts.length>0 && !a.rh.length && !a.lh.length && !a.showPiano);
+  parts.forEach(([p,i])=>out.push(['P'+i, p.label||('樂器 '+(i+1))])); if(piano){ out.push(['RH','鋼琴右手（高音譜）']); out.push(['LH','鋼琴左手（低音譜）']); } return out; }
+function pdfHide(){ return new Set([...document.querySelectorAll('#pdStaves input[data-k]')].filter(c=>!c.checked).map(c=>c.dataset.k)); }
+function drawPdfStaves(){ const L=pdfStaffList(), box=$('pdStaves'); if(L.length<2){ box.innerHTML=''; return; }
+  const keep=S.pdfHide||new Set(), e=x=>String(x).replace(/[<&]/g,c=>({'<':'&lt;','&':'&amp;'})[c]);
+  box.innerHTML='<b>印邊啲譜行</b>'+L.map(([k,zh])=>`<label><input type="checkbox" data-k="${k}" ${keep.has(k)?'':'checked'}> ${e(zh)}</label>`).join('')
+    +'<p class="muted" style="margin:4px 0 0">剔走嘅譜行唔會印（份譜本身唔變）。例如淨係要大提琴：剔走鋼琴右手同左手。</p>';
+  box.querySelectorAll('input[data-k]').forEach(c=>c.onchange=()=>{ if(L.every(([k])=>!box.querySelector(`input[data-k="${k}"]`).checked)){ c.checked=true; $('pdStatus').textContent='最少要印一行譜'; return; }
+    S.pdfHide=pdfHide(); clearTimeout(pdfTimer); pdfTimer=setTimeout(refreshPdfPreview,150); }); }
 function exportPDF(){ if(!S.arr) return;
   try{ const saved=JSON.parse(localStorage.getItem('os.pdf')||'{}'); for(const [k,v] of Object.entries(saved)) if($(k)) $(k).value=v; }catch(e){}
-  $('pdfDlg').hidden=false; PDFi=0; refreshPdfPreview(); }
+  drawPdfStaves(); $('pdfDlg').hidden=false; PDFi=0; refreshPdfPreview(); }
 ['pdPaper','pdOrient','pdMarginPreset','pdScale','pdBars','pdRows','pdGap','pdPageNo','pdHeader'].forEach(id=>$(id).addEventListener('input',()=>{
   try{ const o={}; ['pdPaper','pdOrient','pdMarginPreset','pdScale','pdBars','pdRows','pdGap','pdPageNo','pdHeader'].forEach(k=>o[k]=$(k).value); localStorage.setItem('os.pdf',JSON.stringify(o)); }catch(e){}
   clearTimeout(pdfTimer); pdfTimer=setTimeout(refreshPdfPreview,250); }));
@@ -5152,7 +5170,8 @@ $('pdSave').onclick=async()=>{
       if(st.pageNo==='c') pdf.text(`${i} / ${n}`, L.W/2, L.H-L.M*0.6, {align:'center'});
       if(st.pageNo==='r') pdf.text(String(i), L.W-L.M, L.H-L.M*0.6, {align:'right'});
       if(st.header && i>1){ const tc=textCanvas(S.title); const hh=3.2; pdf.addImage(tc.toDataURL('image/png'),'PNG',L.M,L.M-hh-0.5,tc.width/tc.height*hh,hh); } }
-    pdf.save(safe()+'_Lv'+S.level+'.pdf'); $('pdStatus').textContent='已下載'; }
+    const hid=pdfHide(), inc=pdfStaffList().filter(([k])=>!hid.has(k)).map(([,zh])=>zh.replace(/（.*）/,''));
+    pdf.save(safe()+(hid.size?'_'+inc.join('+'):'_Lv'+S.level)+'.pdf'); $('pdStatus').textContent='已下載'; }
   catch(err){ console.error(err); $('pdStatus').textContent='失敗：'+(err.message||err); } };
 
 function makeMidi(kind){
